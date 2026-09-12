@@ -73,7 +73,7 @@ export function AcceptInvite({ token: tokenProp }: { token?: string }) {
               Welcome, {state.data.fullName.split(' ')[0]}
             </h1>
             <p className="mt-1 text-[13px] text-ink-soft">
-              Set a password to activate your Northwind People account.
+              Set a password to activate your Sribees HRM account.
             </p>
 
             <dl className="mt-5 grid grid-cols-2 gap-3 rounded-lg border border-line bg-canvas px-4 py-3 text-[13px]">

@@ -25,7 +25,7 @@ export function AdminDashboard() {
         <h1 className="text-xl font-semibold tracking-tight text-ink">
           Good day, {profile?.fullName.split(' ')[0]}
         </h1>
-        <p className="mt-1 text-[13px] text-ink-soft">Live view of attendance, leave and headcount across Northwind.</p>
+        <p className="mt-1 text-[13px] text-ink-soft">Live view of attendance, leave and headcount across Sribees.</p>
       </header>
 
       <AsyncBoundary state={state} loadingRows={5}>

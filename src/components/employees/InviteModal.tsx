@@ -97,7 +97,7 @@ export function InviteModal({ open, onClose, onSuccess, departments }: Props) {
           value={form.email}
           onChange={(event) => set('email', event.target.value)}
           error={errors.email}
-          placeholder="name@northwind.example" />
+          placeholder="name@sribees.com" />
         
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField

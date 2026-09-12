@@ -97,7 +97,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Brand compact />
             </div>
             <p className="hidden text-sm font-semibold text-white lg:block">
-              {items.find((item) => item.to === pathname)?.label ?? 'Northwind People'}
+              {items.find((item) => item.to === pathname)?.label ?? 'Sribees HRM'}
             </p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -142,12 +142,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2 px-1">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-[13px] font-bold text-brand-800 shadow-sm">
-        N
-      </span>
+      <img src="/logo.png" alt="Logo" className="h-7 w-auto object-contain max-w-[120px]" />
       {!compact ? (
         <span className="text-sm font-bold tracking-tight text-white">
-          Northwind <span className="text-white/80 font-normal">People</span>
+          HRM
         </span>
       ) : null}
     </div>

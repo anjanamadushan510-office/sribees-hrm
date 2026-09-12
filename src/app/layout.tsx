@@ -6,7 +6,7 @@ import { NotificationsProvider } from '../contexts/NotificationsContext';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Northwind People - HRM System',
+  title: 'Sribees HRM - Human Resource Management System',
   description: 'Human Resource Management & Attendance System',
 };
 

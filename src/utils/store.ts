@@ -1,8 +1,8 @@
 import { buildSeed } from '../data/seed';
 import type { Database } from '../types';
 
-const DB_KEY = 'northwind.hrms.db.v1';
-const SESSION_KEY = 'northwind.hrms.session.v1';
+const DB_KEY = 'sribees.hrms.db.v1';
+const SESSION_KEY = 'sribees.hrms.session.v1';
 
 let cache: Database | null = null;
 

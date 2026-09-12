@@ -4,14 +4,13 @@
 
 Only the two public Supabase values ever reach the browser bundle. Everything else is
 server-side and must never be prefixed with `VITE_`.
-
 ### Client (build-time, safe to expose)
 
-| Variable | Example | Purpose |
-| --- | --- | --- |
-| `VITE_SUPABASE_URL` | `https://abcd1234.supabase.co` | Project REST/Auth endpoint. |
-| `VITE_SUPABASE_ANON_KEY` | `eyJhbGciOi...` | Anonymous key. Safe **only** because RLS is enabled and forced on every table. |
-| `VITE_APP_URL` | `https://people.northwind.com` | Base URL used to build invitation links. |
+Set these in Vercel / Netlify / `.env.production`:
+
+| Variable | Example | Notes |
+|---|---|---|
+| `VITE_APP_URL` | `https://hrm.sribees.com` | Base URL used to build invitation links. |
 
 ### Server / edge functions (secret — never expose)
 

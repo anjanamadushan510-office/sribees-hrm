@@ -1,5 +1,5 @@
 -- 20260101000000_init_schema.sql
--- Core schema for Northwind People. Tables only; policies live in a later migration.
+-- Core schema for Sribees HRM. Tables only; policies live in a later migration.
 
 create extension if not exists "pgcrypto";
 

@@ -145,7 +145,7 @@ export async function runSecurityChecks(session: Session | null): Promise<CheckR
       'Only HR can create invitations',
       () =>
       inviteEmployee(employeeSession, {
-        email: 'intruder@northwind.example',
+        email: 'intruder@sribees.com',
         fullName: 'Intruder Test',
         role: 'admin',
         jobTitle: 'Test',

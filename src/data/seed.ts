@@ -20,7 +20,7 @@ function rng(seed: number) {
 const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 {
   id: 'u-admin',
-  email: 'dana.okafor@northwind.example',
+  email: 'dana.okafor@sribees.com',
   fullName: 'Dana Okafor',
   role: 'admin',
   jobTitle: 'Head of People',
@@ -36,7 +36,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-2',
-  email: 'marco.silva@northwind.example',
+  email: 'marco.silva@sribees.com',
   fullName: 'Marco Silva',
   role: 'employee',
   jobTitle: 'Senior Backend Engineer',
@@ -52,7 +52,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-3',
-  email: 'aisha.rahman@northwind.example',
+  email: 'aisha.rahman@sribees.com',
   fullName: 'Aisha Rahman',
   role: 'employee',
   jobTitle: 'Product Designer',
@@ -68,7 +68,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-4',
-  email: 'liam.chen@northwind.example',
+  email: 'liam.chen@sribees.com',
   fullName: 'Liam Chen',
   role: 'employee',
   jobTitle: 'Data Analyst',
@@ -84,7 +84,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-5',
-  email: 'sofia.novak@northwind.example',
+  email: 'sofia.novak@sribees.com',
   fullName: 'Sofia Novak',
   role: 'employee',
   jobTitle: 'Customer Success Lead',
@@ -100,7 +100,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-6',
-  email: 'noah.adeyemi@northwind.example',
+  email: 'noah.adeyemi@sribees.com',
   fullName: 'Noah Adeyemi',
   role: 'employee',
   jobTitle: 'Frontend Engineer',
@@ -116,7 +116,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-7',
-  email: 'elena.rossi@northwind.example',
+  email: 'elena.rossi@sribees.com',
   fullName: 'Elena Rossi',
   role: 'employee',
   jobTitle: 'Recruiter',
@@ -132,7 +132,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
 },
 {
   id: 'u-8',
-  email: 'tomas.berg@northwind.example',
+  email: 'tomas.berg@sribees.com',
   fullName: 'Tomas Berg',
   role: 'employee',
   jobTitle: 'QA Engineer',
@@ -152,7 +152,7 @@ const PEOPLE: Array<Omit<Profile, 'createdAt'>> = [
  * Demo credentials only. A production deployment delegates all password
  * handling to Supabase Auth — no secret ever reaches the browser bundle.
  */
-const DEMO_PASSWORD = 'northwind2026';
+const DEMO_PASSWORD = 'sribees2026';
 
 function buildAttendance(profiles: Profile[]): AttendanceEntry[] {
   const random = rng(20260911);
@@ -329,7 +329,7 @@ export function buildSeed(): Database {
     invitations: [
     {
       id: 'inv-1',
-      email: 'priya.menon@northwind.example',
+      email: 'priya.menon@sribees.com',
       fullName: 'Priya Menon',
       role: 'employee',
       jobTitle: 'Payroll Specialist',
@@ -382,17 +382,17 @@ export function buildSeed(): Database {
     {
       id: 'log-1',
       actorId: 'u-admin',
-      actorEmail: 'dana.okafor@northwind.example',
+      actorEmail: 'dana.okafor@sribees.com',
       action: 'invitation.sent',
       entity: 'invitation',
       entityId: 'inv-1',
-      meta: { email: 'priya.menon@northwind.example', role: 'employee' },
+      meta: { email: 'priya.menon@sribees.com', role: 'employee' },
       createdAt: new Date(Date.now() - 2 * 86400_000).toISOString()
     },
     {
       id: 'log-2',
       actorId: 'u-admin',
-      actorEmail: 'dana.okafor@northwind.example',
+      actorEmail: 'dana.okafor@sribees.com',
       action: 'leave.approved',
       entity: 'leave_request',
       entityId: 'lv-2',
@@ -404,5 +404,5 @@ export function buildSeed(): Database {
 }
 
 export const DEMO_ACCOUNTS = [
-{ label: 'HR / Admin', email: 'dana.okafor@northwind.example', password: DEMO_PASSWORD },
-{ label: 'Employee', email: 'marco.silva@northwind.example', password: DEMO_PASSWORD }];
+{ label: 'HR / Admin', email: 'dana.okafor@sribees.com', password: DEMO_PASSWORD },
+{ label: 'Employee', email: 'marco.silva@sribees.com', password: DEMO_PASSWORD }];
