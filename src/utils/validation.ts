@@ -24,6 +24,7 @@ export interface ProfileInput {
   location: string;
   timezone: string;
   emergencyContact: string;
+  workMode?: WorkMode;
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;

@@ -9,10 +9,11 @@ import { ValidationError, toMessage } from '../utils/policies';
 import { hasErrors, validateProfile } from '../utils/validation';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
-import { TextField } from '../components/ui/Field';
+import { TextField, SelectField } from '../components/ui/Field';
 import { Avatar } from '../components/ui/Avatar';
 import { Badge, EmploymentBadge, WorkModeBadge } from '../components/ui/Badge';
 import { formatDate } from '../utils/time';
+import type { WorkMode } from '../types';
 
 export function MyProfile() {
   const { session, profile, isAdmin, refreshProfile } = useAuth();
@@ -20,7 +21,8 @@ export function MyProfile() {
     phone: profile?.phone ?? '',
     location: profile?.location ?? '',
     timezone: profile?.timezone ?? '',
-    emergencyContact: profile?.emergencyContact ?? ''
+    emergencyContact: profile?.emergencyContact ?? '',
+    workMode: (profile?.workMode ?? 'office') as WorkMode
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
@@ -49,7 +51,7 @@ export function MyProfile() {
   };
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header className="flex flex-wrap items-center gap-4 rounded-xl border border-line bg-surface p-5 shadow-card sm:p-6">
         <Avatar name={profile.fullName} size="lg" />
         <div className="min-w-0 flex-1">
@@ -65,81 +67,93 @@ export function MyProfile() {
         </div>
       </header>
 
-      <Card>
-        <CardHeader title="Your details" description="These are the only fields you can change yourself." />
-        <CardBody>
-          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <TextField
-                label="Phone"
-                value={form.phone}
-                onChange={(event) => setForm({ ...form, phone: event.target.value })}
-                error={errors.phone}
-                placeholder="+1 555 000 0000" />
-              
-              <TextField
-                label="Location"
-                value={form.location}
-                onChange={(event) => setForm({ ...form, location: event.target.value })}
-                error={errors.location}
-                placeholder="City, Country" />
-              
-              <TextField
-                label="Timezone"
-                required
-                value={form.timezone}
-                onChange={(event) => setForm({ ...form, timezone: event.target.value })}
-                error={errors.timezone}
-                hint="Used to show your local working hours to teammates." />
-              
-              <TextField
-                label="Emergency contact"
-                value={form.emergencyContact}
-                onChange={(event) => setForm({ ...form, emergencyContact: event.target.value })}
-                error={errors.emergencyContact}
-                placeholder="Name · phone number" />
-              
-            </div>
-            <div className="flex justify-end">
-              <Button type="submit" loading={saving}>
-                Save details
-              </Button>
-            </div>
-          </form>
-        </CardBody>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <Card>
+          <CardHeader title="Your details" description="These are the fields you can change yourself." />
+          <CardBody>
+            <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <SelectField
+                  label="Work mode"
+                  value={form.workMode}
+                  onChange={(event) => setForm({ ...form, workMode: event.target.value as WorkMode })}
+                  hint="Your default location mode (Office, Remote, or Hybrid)">
+                  <option value="office">Office</option>
+                  <option value="remote">Remote</option>
+                  <option value="hybrid">Hybrid</option>
+                </SelectField>
 
-      <Card>
-        <CardHeader
-          title="Managed by People Operations"
-          description="Ask HR if any of these need to change — they are not editable by employees." />
-        
-        <CardBody>
-          <dl className="grid gap-4 text-[13px] sm:grid-cols-2">
-            <div>
-              <dt className="text-ink-soft">Work email</dt>
-              <dd className="mt-0.5 font-medium text-ink">{profile.email}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-soft">Job title</dt>
-              <dd className="mt-0.5 font-medium text-ink">{profile.jobTitle}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-soft">Department</dt>
-              <dd className="mt-0.5 font-medium text-ink">{profile.department}</dd>
-            </div>
-            <div>
-              <dt className="text-ink-soft">Start date</dt>
-              <dd className="mt-0.5 font-medium text-ink">{formatDate(profile.hireDate)}</dd>
-            </div>
-          </dl>
-          <p className="mt-4 flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2.5 text-[12px] text-ink-soft">
-            <LockIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-            Access level, employment status and leave entitlements are protected by row-level security. Attempts to
-            change them from this account are rejected by the database, not just hidden in the interface.
-          </p>
-        </CardBody>
-      </Card>
+                <TextField
+                  label="Phone"
+                  value={form.phone}
+                  onChange={(event) => setForm({ ...form, phone: event.target.value })}
+                  error={errors.phone}
+                  placeholder="+1 555 000 0000" />
+                
+                <TextField
+                  label="Location"
+                  value={form.location}
+                  onChange={(event) => setForm({ ...form, location: event.target.value })}
+                  error={errors.location}
+                  placeholder="City, Country" />
+                
+                <TextField
+                  label="Timezone"
+                  required
+                  value={form.timezone}
+                  onChange={(event) => setForm({ ...form, timezone: event.target.value })}
+                  error={errors.timezone}
+                  hint="Used to show your local working hours to teammates." />
+                
+                <TextField
+                  label="Emergency contact"
+                  value={form.emergencyContact}
+                  onChange={(event) => setForm({ ...form, emergencyContact: event.target.value })}
+                  error={errors.emergencyContact}
+                  placeholder="Name · phone number" />
+                
+              </div>
+              <div className="flex justify-end">
+                <Button type="submit" loading={saving}>
+                  Save details
+                </Button>
+              </div>
+            </form>
+          </CardBody>
+        </Card>
+
+        <Card className="h-fit">
+          <CardHeader
+            title="Managed by People Operations"
+            description="Ask HR if any of these need to change — they are not editable by employees." />
+          
+          <CardBody>
+            <dl className="grid gap-4 text-[13px] sm:grid-cols-2">
+              <div>
+                <dt className="text-ink-soft">Work email</dt>
+                <dd className="mt-0.5 font-medium text-ink">{profile.email}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Job title</dt>
+                <dd className="mt-0.5 font-medium text-ink">{profile.jobTitle}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Department</dt>
+                <dd className="mt-0.5 font-medium text-ink">{profile.department}</dd>
+              </div>
+              <div>
+                <dt className="text-ink-soft">Start date</dt>
+                <dd className="mt-0.5 font-medium text-ink">{formatDate(profile.hireDate)}</dd>
+              </div>
+            </dl>
+            <p className="mt-4 flex items-start gap-2 rounded-md border border-line bg-canvas px-3 py-2.5 text-[12px] text-ink-soft">
+              <LockIcon className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+              Access level, employment status and leave entitlements are protected by row-level security. Attempts to
+              change them from this account are rejected by the database, not just hidden in the interface.
+            </p>
+          </CardBody>
+        </Card>
+      </div>
     </div>);
 
 }

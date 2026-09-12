@@ -64,6 +64,7 @@ input: ProfileInput)
     profile.location = input.location.trim();
     profile.timezone = input.timezone.trim();
     profile.emergencyContact = input.emergencyContact.trim();
+    if (input.workMode) profile.workMode = input.workMode;
     recordAudit(db, active, 'profile.updated', 'profile', employeeId, { fields: Object.keys(input).join(',') });
     return redactProfile(active, profile);
   });

@@ -81,7 +81,7 @@ export function requireSelfOrAdmin(session: Session | null, employeeId: string):
 }
 
 /** Fields an employee may change on their own profile. Everything else is HR-only. */
-export const SELF_EDITABLE_PROFILE_FIELDS = ['phone', 'location', 'timezone', 'emergencyContact'] as const;
+export const SELF_EDITABLE_PROFILE_FIELDS = ['phone', 'location', 'timezone', 'emergencyContact', 'workMode'] as const;
 
 export type SelfEditableField = (typeof SELF_EDITABLE_PROFILE_FIELDS)[number];
 

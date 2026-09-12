@@ -15,7 +15,7 @@ export function Notifications() {
   const router = useRouter();
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <header>
         <h1 className="text-xl font-semibold tracking-tight text-ink">Notifications</h1>
         <p className="mt-1 text-[13px] text-ink-soft">

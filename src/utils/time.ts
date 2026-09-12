@@ -36,6 +36,17 @@ export function businessDaysBetween(startISO: string, endISO: string): number {
  * Worked minutes for a single attendance row.
  * Open shifts are measured up to `now` so live counters stay honest.
  */
+/**
+ * Worked seconds for a single attendance row.
+ * Open shifts are measured up to `now` so live counters stay honest.
+ */
+export function workedSeconds(entry: AttendanceEntry, now: Date = new Date()): number {
+  const start = new Date(entry.clockIn).getTime();
+  const end = entry.clockOut ? new Date(entry.clockOut).getTime() : now.getTime();
+  const grossSecs = Math.max(0, Math.floor((end - start) / 1000));
+  return Math.max(0, grossSecs - Math.max(0, entry.breakMinutes * 60));
+}
+
 export function workedMinutes(entry: AttendanceEntry, now: Date = new Date()): number {
   const start = new Date(entry.clockIn).getTime();
   const end = entry.clockOut ? new Date(entry.clockOut).getTime() : now.getTime();
@@ -53,6 +64,17 @@ export function formatDuration(minutes: number): string {
   const mins = safe % 60;
   if (hours === 0) return `${mins}m`;
   return `${hours}h ${`${mins}`.padStart(2, '0')}m`;
+}
+
+export function formatDurationWithSeconds(totalSeconds: number): string {
+  const safe = Math.max(0, Math.floor(totalSeconds));
+  const hours = Math.floor(safe / 3600);
+  const mins = Math.floor((safe % 3600) / 60);
+  const secs = safe % 60;
+  const hStr = `${hours}`.padStart(2, '0');
+  const mStr = `${mins}`.padStart(2, '0');
+  const sStr = `${secs}`.padStart(2, '0');
+  return `${hStr}h ${mStr}m ${sStr}s`;
 }
 
 export function formatHours(minutes: number): string {
