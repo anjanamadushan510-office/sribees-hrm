@@ -81,11 +81,11 @@ export function AdminDashboard() {
                       <AreaChart data={stats.trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
                         <defs>
                           <linearGradient id="hoursFill" x1="0" y1="0" x2="0" y2="1">
-                            <stop offset="0%" stopColor="#0d7a6f" stopOpacity={0.18} />
-                            <stop offset="100%" stopColor="#0d7a6f" stopOpacity={0.02} />
+                            <stop offset="0%" stopColor="#FFA239" stopOpacity={0.25} />
+                            <stop offset="100%" stopColor="#FFA239" stopOpacity={0.02} />
                           </linearGradient>
                         </defs>
-                        <CartesianGrid stroke="#e4e2dc" vertical={false} />
+                        <CartesianGrid stroke="#e5e0cf" vertical={false} />
                         <XAxis
                         dataKey="label"
                         tickLine={false}
@@ -97,7 +97,7 @@ export function AdminDashboard() {
                         <Tooltip
                         contentStyle={{
                           borderRadius: 8,
-                          border: '1px solid #e4e2dc',
+                          border: '1px solid #e5e0cf',
                           fontSize: 12,
                           boxShadow: '0 12px 32px -12px rgba(28,27,24,0.28)'
                         }}
@@ -109,7 +109,7 @@ export function AdminDashboard() {
                         <Area
                         type="monotone"
                         dataKey="hours"
-                        stroke="#0d7a6f"
+                        stroke="#FFA239"
                         strokeWidth={2}
                         fill="url(#hoursFill)" />
                       

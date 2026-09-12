@@ -61,7 +61,7 @@ export function EmployeeDashboard() {
                   <div className="h-52 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={stats.trend} margin={{ top: 8, right: 8, bottom: 0, left: 0 }}>
-                        <CartesianGrid stroke="#e4e2dc" vertical={false} />
+                        <CartesianGrid stroke="#e5e0cf" vertical={false} />
                         <XAxis
                         dataKey="label"
                         tickLine={false}
@@ -71,14 +71,14 @@ export function EmployeeDashboard() {
                       
                         <YAxis tickLine={false} axisLine={false} tick={{ fontSize: 11, fill: '#8c8a83' }} width={30} />
                         <Tooltip
-                        cursor={{ fill: '#f6f5f1' }}
-                        contentStyle={{ borderRadius: 8, border: '1px solid #e4e2dc', fontSize: 12 }}
+                        cursor={{ fill: '#FCF9EA' }}
+                        contentStyle={{ borderRadius: 8, border: '1px solid #e5e0cf', fontSize: 12 }}
                         formatter={(value: number) => [`${value}h`, 'Logged']}
                         labelFormatter={(_, payload) =>
                         payload && payload.length > 0 ? formatDate(String(payload[0].payload.date)) : ''
                         } />
                       
-                        <Bar dataKey="hours" fill="#3fb298" radius={[3, 3, 0, 0]} maxBarSize={26} />
+                        <Bar dataKey="hours" fill="#FFA239" radius={[3, 3, 0, 0]} maxBarSize={26} />
                       </BarChart>
                     </ResponsiveContainer>
                   </div>

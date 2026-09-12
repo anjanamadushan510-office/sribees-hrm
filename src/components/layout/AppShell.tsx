@@ -63,7 +63,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className={cn(
               'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium',
               'transition-colors duration-150 ease-out',
-              isActive ? 'bg-brand-50 text-brand-800' : 'text-ink-soft hover:bg-canvas hover:text-ink'
+              isActive ? 'bg-white text-brand-900 font-semibold shadow-sm' : 'text-white/90 hover:bg-white/15 hover:text-white'
             )}
           >
             <item.icon className="h-4 w-4 shrink-0" />
@@ -76,18 +76,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-full w-full bg-canvas">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-surface px-3 py-4 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-sidebar px-3 py-4 lg:flex">
         <Brand />
         <div className="mt-6 flex-1">{nav}</div>
         <AccountCard onSignOut={handleSignOut} />
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-surface/95 px-4 backdrop-blur lg:px-8">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-3 border-b border-line bg-navbar px-4 backdrop-blur lg:px-8">
           <div className="flex items-center gap-3">
             <button
               type="button"
-              className="rounded-md p-1.5 text-ink-soft transition-colors duration-150 ease-out hover:bg-canvas hover:text-ink lg:hidden"
+              className="rounded-md p-1.5 text-white transition-colors duration-150 ease-out hover:bg-white/20 lg:hidden"
               onClick={() => setMobileOpen(true)}
               aria-label="Open navigation"
             >
@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="lg:hidden">
               <Brand compact />
             </div>
-            <p className="hidden text-sm font-semibold text-ink lg:block">
+            <p className="hidden text-sm font-semibold text-white lg:block">
               {items.find((item) => item.to === pathname)?.label ?? 'Northwind People'}
             </p>
           </div>
@@ -118,14 +118,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
           <div className="absolute inset-0 bg-ink/35" onClick={() => setMobileOpen(false)} aria-hidden />
-          <div className="relative flex h-full w-64 flex-col border-r border-line bg-surface px-3 py-4">
+          <div className="relative flex h-full w-64 flex-col border-r border-line bg-sidebar px-3 py-4">
             <div className="flex items-center justify-between">
               <Brand />
               <button
                 type="button"
                 onClick={() => setMobileOpen(false)}
                 aria-label="Close navigation"
-                className="rounded-md p-1.5 text-ink-soft hover:bg-canvas"
+                className="rounded-md p-1.5 text-white hover:bg-white/20"
               >
                 <XIcon className="h-4 w-4" />
               </button>
@@ -142,12 +142,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2 px-1">
-      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-brand-600 text-[13px] font-bold text-white">
+      <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-[13px] font-bold text-brand-800 shadow-sm">
         N
       </span>
       {!compact ? (
-        <span className="text-sm font-semibold tracking-tight text-ink">
-          Northwind <span className="text-ink-soft">People</span>
+        <span className="text-sm font-bold tracking-tight text-white">
+          Northwind <span className="text-white/80 font-normal">People</span>
         </span>
       ) : null}
     </div>
@@ -158,22 +158,22 @@ function AccountCard({ onSignOut }: { onSignOut: () => void }) {
   const { profile, isAdmin } = useAuth();
   if (!profile) return null;
   return (
-    <div className="mt-4 border-t border-line pt-3">
+    <div className="mt-4 border-t border-white/20 pt-3">
       <Link
         href="/profile"
-        className="flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 ease-out hover:bg-canvas"
+        className="flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 ease-out hover:bg-white/15 text-white"
       >
         <Avatar name={profile.fullName} size="sm" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium text-ink">{profile.fullName}</span>
-          <span className="block truncate text-[12px] text-ink-soft">{isAdmin ? 'HR administrator' : 'Employee'}</span>
+          <span className="block truncate text-[13px] font-medium text-white">{profile.fullName}</span>
+          <span className="block truncate text-[12px] text-white/80">{isAdmin ? 'HR administrator' : 'Employee'}</span>
         </span>
-        <UserIcon className="h-3.5 w-3.5 text-ink-faint" />
+        <UserIcon className="h-3.5 w-3.5 text-white/70" />
       </Link>
       <button
         type="button"
         onClick={onSignOut}
-        className="mt-1 flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-ink-soft transition-colors duration-150 ease-out hover:bg-canvas hover:text-ink"
+        className="mt-1 flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-white/90 transition-colors duration-150 ease-out hover:bg-white/15 hover:text-white"
       >
         <LogOutIcon className="h-4 w-4" />
         Sign out
