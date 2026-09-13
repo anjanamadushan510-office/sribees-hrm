@@ -10,6 +10,7 @@ export interface InviteInput {
   jobTitle: string;
   department: string;
   workMode: WorkMode;
+  defaultPassword?: string;
 }
 
 export interface LeaveInput {
@@ -45,6 +46,9 @@ export function validateInvite(input: InviteInput): FieldErrors {
   if (!input.department.trim()) errors.department = 'Department is required.';
   if (input.role !== 'admin' && input.role !== 'employee') errors.role = 'Choose a valid role.';
   if (!['office', 'remote', 'hybrid'].includes(input.workMode)) errors.workMode = 'Choose a work mode.';
+  if (input.defaultPassword !== undefined && input.defaultPassword.trim().length < 8) {
+    errors.defaultPassword = 'Default password must be at least 8 characters.';
+  }
   return errors;
 }
 
@@ -82,6 +86,16 @@ export function validateCredentials(email: string, password: string): FieldError
   if (!EMAIL_RE.test(email.trim())) errors.email = 'Enter a valid email address.';
   if (!password) errors.password = 'Password is required.';else
   if (password.length < 8) errors.password = 'Passwords are at least 8 characters.';
+  return errors;
+}
+
+export function validatePasswordChange(currentPassword: string, newPassword: string, confirmPassword: string): FieldErrors {
+  const errors: FieldErrors = {};
+  if (!currentPassword) errors.currentPassword = 'Current password is required.';
+  if (!newPassword) errors.newPassword = 'New password is required.';
+  else if (newPassword.length < 8) errors.newPassword = 'New password must be at least 8 characters.';
+  if (!confirmPassword) errors.confirmPassword = 'Confirm your new password.';
+  else if (newPassword !== confirmPassword) errors.confirmPassword = 'Passwords do not match.';
   return errors;
 }
 

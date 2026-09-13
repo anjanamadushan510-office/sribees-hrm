@@ -25,6 +25,7 @@ export interface Profile {
   status: EmploymentStatus;
   hireDate: string;
   emergencyContact: string;
+  mustChangePassword?: boolean;
   createdAt: string;
 }
 
@@ -39,6 +40,7 @@ export interface Invitation {
   token: string;
   status: InvitationStatus;
   invitedBy: string;
+  defaultPassword?: string;
   createdAt: string;
   expiresAt: string;
 }

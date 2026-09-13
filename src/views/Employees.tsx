@@ -54,6 +54,17 @@ export function Employees() {
     }
   };
 
+  const copyCredentials = async (email: string, defaultPassword?: string) => {
+    const pwd = defaultPassword || 'Sribees@2026';
+    const text = `Email: ${email}\nDefault Password: ${pwd}`;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast.success('Login credentials copied.');
+    } catch {
+      toast.message('Login credentials', { description: text });
+    }
+  };
+
   const handleRevoke = async (id: string) => {
     setBusyId(id);
     try {
@@ -108,7 +119,7 @@ export function Employees() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[13px] font-medium text-ink">{invite.fullName}</p>
                   <p className="truncate text-[12px] text-ink-soft">
-                    {invite.email} · {invite.jobTitle} · sent {relativeTime(invite.createdAt)}
+                    {invite.email} · {invite.jobTitle} {invite.defaultPassword ? `· Default pwd: ${invite.defaultPassword}` : ''}
                   </p>
                 </div>
                 <Badge tone={invite.role === 'admin' ? 'brand' : 'neutral'}>
@@ -116,6 +127,9 @@ export function Employees() {
                 </Badge>
                 <p className="text-[12px] text-ink-soft">Expires {formatDate(invite.expiresAt)}</p>
                 <div className="flex gap-1.5">
+                  <Button size="sm" variant="ghost" icon={<CopyIcon className="h-3.5 w-3.5" />} onClick={() => void copyCredentials(invite.email, invite.defaultPassword)}>
+                    Copy credentials
+                  </Button>
                   <Button size="sm" variant="ghost" icon={<CopyIcon className="h-3.5 w-3.5" />} onClick={() => void copyLink(invite.token)}>
                     Copy link
                   </Button>

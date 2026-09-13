@@ -22,7 +22,8 @@ const EMPTY = {
   jobTitle: '',
   department: '',
   role: 'employee' as Role,
-  workMode: 'hybrid' as WorkMode
+  workMode: 'hybrid' as WorkMode,
+  defaultPassword: 'Sribees@2026'
 };
 
 export function InviteModal({ open, onClose, onSuccess, departments }: Props) {
@@ -54,7 +55,7 @@ export function InviteModal({ open, onClose, onSuccess, departments }: Props) {
     setFormError(null);
     try {
       const invitation = await inviteEmployee(session, form);
-      toast.success(`Invitation sent to ${invitation.email}`);
+      toast.success(`Account created with default password for ${invitation.email}`);
       close();
       onSuccess(`${window.location.origin}/invite/${invitation.token}`);
     } catch (error) {
@@ -70,14 +71,14 @@ export function InviteModal({ open, onClose, onSuccess, departments }: Props) {
       open={open}
       onClose={close}
       title="Invite an employee"
-      description="They receive a single-use link that expires in seven days."
+      description="Add an employee with a default password. They can sign in immediately and update their password."
       footer={
       <>
           <Button variant="secondary" onClick={close}>
             Cancel
           </Button>
           <Button form="invite-form" type="submit" loading={submitting}>
-            Send invitation
+            Add employee
           </Button>
         </>
       }>
@@ -145,6 +146,14 @@ export function InviteModal({ open, onClose, onSuccess, departments }: Props) {
             <option value="hybrid">Hybrid</option>
           </SelectField>
         </div>
+
+        <TextField
+          label="Default password"
+          required
+          value={form.defaultPassword}
+          onChange={(event) => set('defaultPassword', event.target.value)}
+          error={errors.defaultPassword}
+          hint="Temporary password for initial login. The employee will change this password after logging in." />
 
         {formError ?
         <p role="alert" className="rounded-md border border-danger/30 bg-danger-soft px-3 py-2 text-[13px] text-danger-ink">

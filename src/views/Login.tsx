@@ -55,7 +55,7 @@ export function Login() {
   return (
     <div className="flex h-screen max-h-screen w-full flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-surface">
       {/* Left Illustration Section */}
-      <section className="relative flex h-full min-h-[360px] lg:min-h-0 lg:w-1/2 flex-col justify-between bg-canvas px-6 py-6 lg:px-12 lg:py-8">
+      <section className="relative hidden lg:flex h-full lg:w-1/2 flex-col justify-between bg-canvas px-6 py-6 lg:px-12 lg:py-8">
         {/* Curved Wave Transition to Right Panel (Desktop only) */}
         <div className="pointer-events-none absolute inset-y-0 -right-1 hidden w-24 text-surface lg:block" aria-hidden>
           <svg className="h-full w-full fill-current" viewBox="0 0 100 100" preserveAspectRatio="none">

@@ -112,6 +112,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
+        {profile?.mustChangePassword && pathname !== '/profile' ? (
+          <div className="flex items-center justify-center gap-2 border-b border-warn/20 bg-warn-soft px-4 py-2 text-center text-xs font-medium text-warn-ink">
+            <span>You are logged in with a temporary default password. Please update your password for security.</span>
+            <Link href="/profile#change-password" className="font-bold underline hover:opacity-80">
+              Change password
+            </Link>
+          </div>
+        ) : null}
+
         <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
       </div>
 

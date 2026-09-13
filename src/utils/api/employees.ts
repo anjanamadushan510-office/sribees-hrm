@@ -183,6 +183,9 @@ export async function inviteEmployee(session: Session | null, input: InviteInput
   await sleep(380);
 
   const email = input.email.trim().toLowerCase();
+  const defaultPassword = input.defaultPassword?.trim() || 'Sribees@2026';
+  const year = new Date().getFullYear();
+
   return mutate((db) => {
     if (db.profiles.some((p) => p.email.toLowerCase() === email)) {
       throw new ConflictError('Someone with that email already has an account.');
@@ -190,6 +193,44 @@ export async function inviteEmployee(session: Session | null, input: InviteInput
     if (db.invitations.some((i) => i.email.toLowerCase() === email && i.status === 'pending')) {
       throw new ConflictError('There is already a pending invitation for that email.');
     }
+
+    const newUserId = uid('u');
+    const profile: Profile = {
+      id: newUserId,
+      email,
+      fullName: input.fullName.trim(),
+      role: input.role,
+      jobTitle: input.jobTitle.trim(),
+      department: input.department.trim(),
+      managerId: active.userId,
+      phone: '',
+      location: '',
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      workMode: input.workMode,
+      status: 'active',
+      hireDate: nowIso().slice(0, 10),
+      emergencyContact: '',
+      mustChangePassword: true,
+      createdAt: nowIso()
+    };
+
+    db.profiles.push(profile);
+    db.credentials[email] = defaultPassword;
+
+    db.presence.push({
+      employeeId: profile.id,
+      status: 'off_shift',
+      workMode: profile.workMode,
+      updatedAt: nowIso()
+    });
+
+    db.leaveEntitlements.push(
+      { employeeId: profile.id, year, type: 'annual', days: 25 },
+      { employeeId: profile.id, year, type: 'sick', days: 10 },
+      { employeeId: profile.id, year, type: 'parental', days: 20 },
+      { employeeId: profile.id, year, type: 'unpaid', days: 15 }
+    );
+
     const invitation: Invitation = {
       id: uid('inv'),
       email,
@@ -201,6 +242,7 @@ export async function inviteEmployee(session: Session | null, input: InviteInput
       token: uid('token'),
       status: 'pending',
       invitedBy: active.userId,
+      defaultPassword,
       createdAt: nowIso(),
       expiresAt: new Date(Date.now() + 7 * 86400_000).toISOString()
     };
@@ -209,8 +251,8 @@ export async function inviteEmployee(session: Session | null, input: InviteInput
     notifyAdmins(
       db,
       'invitation_sent',
-      `Invitation sent to ${invitation.fullName}`,
-      `${invitation.jobTitle} · ${invitation.department}. Expires in 7 days.`,
+      `Employee added: ${invitation.fullName}`,
+      `${invitation.jobTitle} · ${invitation.department}. Default password set.`,
       '/employees',
       active.userId
     );

@@ -1,7 +1,7 @@
 import type { Profile, Session } from '../../types';
-import { AuthError, ForbiddenError, ValidationError } from '../policies';
+import { AuthError, ForbiddenError, ValidationError, requireSession } from '../policies';
 import { getDb, mutate, nowIso, readSessionToken, sleep, writeSessionToken } from '../store';
-import { hasErrors, validateCredentials } from '../validation';
+import { hasErrors, validateCredentials, validatePasswordChange } from '../validation';
 import { recordAudit } from './audit';
 
 /**
@@ -51,6 +51,35 @@ export async function restoreSession(): Promise<{session: Session;profile: Profi
     return null;
   }
   return { session: buildSession(profile), profile };
+}
+
+export async function changePassword(
+  session: Session | null,
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword: string
+): Promise<void> {
+  const active = requireSession(session);
+  const clientErrors = validatePasswordChange(currentPassword, newPassword, confirmPassword);
+  if (hasErrors(clientErrors)) throw new ValidationError(clientErrors);
+
+  await sleep(400);
+
+  mutate((db) => {
+    const profile = db.profiles.find((p) => p.id === active.userId);
+    if (!profile) throw new AuthError('User profile not found.');
+
+    const normalized = profile.email.toLowerCase();
+    const stored = db.credentials[normalized];
+
+    if (!stored || stored !== currentPassword) {
+      throw new ValidationError({ currentPassword: 'Current password is incorrect.' });
+    }
+
+    db.credentials[normalized] = newPassword;
+    profile.mustChangePassword = false;
+    recordAudit(db, active, 'auth.password_changed', 'profile', profile.id, {});
+  });
 }
 
 export async function signOut(session: Session | null): Promise<void> {
