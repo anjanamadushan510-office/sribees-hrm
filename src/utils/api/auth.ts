@@ -1,30 +1,63 @@
 import type { Profile, Session } from '../../types';
+import { getSupabase } from '../../lib/supabase/client';
+import { mapProfileFromDb } from '../../types/database.types';
 import { AuthError, ForbiddenError, ValidationError, requireSession } from '../policies';
 import { getDb, mutate, nowIso, readSessionToken, sleep, writeSessionToken } from '../store';
 import { hasErrors, validateCredentials, validatePasswordChange } from '../validation';
 import { recordAudit } from './audit';
 
-/**
- * Demo auth adapter. In production this module is the ONLY file that changes:
- * signIn/signOut/restoreSession map directly onto supabase.auth.signInWithPassword,
- * signOut and getSession. Passwords are never compared in the browser there.
- */
-
 function buildSession(profile: Profile): Session {
   return { userId: profile.id, email: profile.email, role: profile.role, issuedAt: nowIso() };
 }
 
-export async function signIn(email: string, password: string): Promise<{session: Session;profile: Profile;}> {
+export async function signIn(email: string, password: string): Promise<{ session: Session; profile: Profile }> {
   const errors = validateCredentials(email, password);
   if (hasErrors(errors)) throw new ValidationError(errors);
-  await sleep(420);
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim().toLowerCase(),
+      password
+    });
+
+    if (authError || !authData.user) {
+      throw new AuthError(authError?.message || 'Incorrect email or password.');
+    }
+
+    const { data: profileRow, error: profileError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.user.id)
+      .single();
+
+    if (profileError || !profileRow) {
+      throw new AuthError('User profile not found in database.');
+    }
+
+    const profile = mapProfileFromDb(profileRow);
+
+    if (profile.status === 'suspended') {
+      await supabase.auth.signOut();
+      throw new ForbiddenError('This account is suspended. Contact People Operations.');
+    }
+
+    if (profile.status === 'invited') {
+      await supabase.auth.signOut();
+      throw new ForbiddenError('Finish setting up your account from the invitation link first.');
+    }
+
+    const session = buildSession(profile);
+    return { session, profile };
+  }
+
+  // Demo / Local storage fallback mode
+  await sleep(420);
   const normalized = email.trim().toLowerCase();
   const db = getDb();
   const profile = db.profiles.find((p) => p.email.toLowerCase() === normalized);
   const stored = db.credentials[normalized];
 
-  // A single generic message: never reveal whether the address exists.
   if (!profile || !stored || stored !== password) {
     throw new AuthError('Incorrect email or password.');
   }
@@ -41,7 +74,28 @@ export async function signIn(email: string, password: string): Promise<{session:
   return { session, profile };
 }
 
-export async function restoreSession(): Promise<{session: Session;profile: Profile;} | null> {
+export async function restoreSession(): Promise<{ session: Session; profile: Profile } | null> {
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data: authData } = await supabase.auth.getSession();
+    if (!authData.session?.user) return null;
+
+    const { data: profileRow } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', authData.session.user.id)
+      .single();
+
+    if (!profileRow || profileRow.status !== 'active') {
+      await supabase.auth.signOut();
+      return null;
+    }
+
+    const profile = mapProfileFromDb(profileRow);
+    return { session: buildSession(profile), profile };
+  }
+
+  // Demo fallback mode
   await sleep(200);
   const userId = readSessionToken();
   if (!userId) return null;
@@ -63,8 +117,17 @@ export async function changePassword(
   const clientErrors = validatePasswordChange(currentPassword, newPassword, confirmPassword);
   if (hasErrors(clientErrors)) throw new ValidationError(clientErrors);
 
-  await sleep(400);
+  const supabase = getSupabase();
+  if (supabase) {
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      throw new ValidationError({ currentPassword: error.message });
+    }
+    return;
+  }
 
+  // Demo fallback mode
+  await sleep(400);
   mutate((db) => {
     const profile = db.profiles.find((p) => p.id === active.userId);
     if (!profile) throw new AuthError('User profile not found.');
@@ -83,6 +146,13 @@ export async function changePassword(
 }
 
 export async function signOut(session: Session | null): Promise<void> {
+  const supabase = getSupabase();
+  if (supabase) {
+    await supabase.auth.signOut();
+    return;
+  }
+
+  // Demo fallback mode
   if (session) {
     mutate((db) => recordAudit(db, session, 'auth.signed_out', 'profile', session.userId, {}));
   }

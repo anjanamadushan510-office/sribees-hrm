@@ -1,4 +1,6 @@
 import type { LeaveBalance, LeaveRequest, LeaveStatus, LeaveType, Profile, Session } from '../../types';
+import { getSupabase } from '../../lib/supabase/client';
+import { mapLeaveRequestFromDb, mapProfileFromDb } from '../../types/database.types';
 import {
   ConflictError,
   ForbiddenError,
@@ -8,8 +10,8 @@ import {
   isAdmin,
   requireAdmin,
   requireSelfOrAdmin,
-  requireSession } from
-'../policies';
+  requireSession
+} from '../policies';
 import { getDb, mutate, nowIso, sleep, uid } from '../store';
 import { businessDaysBetween, datesOverlap, todayISO } from '../time';
 import { hasErrors, validateLeave } from '../validation';
@@ -73,39 +75,89 @@ export interface LeaveRequestRow extends LeaveRequest {
 
 export async function listLeaveRequests(session: Session | null, filter: LeaveFilter = {}): Promise<LeaveRequestRow[]> {
   const active = requireSession(session);
-  // Employees may only ever read their own rows, whatever they ask for.
   const scopedEmployeeId = isAdmin(active) ? filter.employeeId : active.userId;
   if (!isAdmin(active) && filter.employeeId && filter.employeeId !== active.userId) {
     throw new ForbiddenError('You can only view your own leave requests.');
   }
-  await sleep();
 
+  const supabase = getSupabase();
+  if (supabase) {
+    let query = supabase.from('leave_requests').select('*');
+    if (scopedEmployeeId) query = query.eq('employee_id', scopedEmployeeId);
+    if (filter.status && filter.status !== 'all') query = query.eq('status', filter.status);
+    if (filter.type && filter.type !== 'all') query = query.eq('type', filter.type);
+
+    const { data: requests, error } = await query.order('created_at', { ascending: false });
+    if (error) throw new Error(error.message);
+
+    const { data: profiles } = await supabase.from('profiles').select('id, full_name, job_title, department');
+    const profileMap = new Map((profiles || []).map((p) => [p.id, mapProfileFromDb(p as any)]));
+
+    return (requests || []).map((reqRow) => {
+      const req = mapLeaveRequestFromDb(reqRow);
+      const employee = profileMap.get(req.employeeId);
+      return {
+        ...req,
+        employee: {
+          id: req.employeeId,
+          fullName: employee?.fullName ?? 'Former employee',
+          jobTitle: employee?.jobTitle ?? '—',
+          department: employee?.department ?? '—'
+        }
+      };
+    });
+  }
+
+  await sleep();
   const db = getDb();
-  return db.leaveRequests.
-  filter((r) => scopedEmployeeId ? r.employeeId === scopedEmployeeId : true).
-  filter((r) => filter.status && filter.status !== 'all' ? r.status === filter.status : true).
-  filter((r) => filter.type && filter.type !== 'all' ? r.type === filter.type : true).
-  map((request) => {
-    const employee = db.profiles.find((p) => p.id === request.employeeId);
-    return {
-      ...request,
-      employee: {
-        id: request.employeeId,
-        fullName: employee?.fullName ?? 'Former employee',
-        jobTitle: employee?.jobTitle ?? '—',
-        department: employee?.department ?? '—'
-      }
-    };
-  }).
-  sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return db.leaveRequests
+    .filter((r) => (scopedEmployeeId ? r.employeeId === scopedEmployeeId : true))
+    .filter((r) => (filter.status && filter.status !== 'all' ? r.status === filter.status : true))
+    .filter((r) => (filter.type && filter.type !== 'all' ? r.type === filter.type : true))
+    .map((request) => {
+      const employee = db.profiles.find((p) => p.id === request.employeeId);
+      return {
+        ...request,
+        employee: {
+          id: request.employeeId,
+          fullName: employee?.fullName ?? 'Former employee',
+          jobTitle: employee?.jobTitle ?? '—',
+          department: employee?.department ?? '—'
+        }
+      };
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
-/**
- * Balances are always DERIVED from the request table, never stored as a counter,
- * so an approval and its balance can never drift apart.
- */
 export async function getLeaveBalances(session: Session | null, employeeId: string): Promise<LeaveBalance[]> {
   requireSelfOrAdmin(session, employeeId);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const year = new Date().getFullYear();
+    const [entitlementsRes, requestsRes] = await Promise.all([
+      supabase.from('leave_entitlements').select('*').eq('employee_id', employeeId).eq('year', year),
+      supabase.from('leave_requests').select('*').eq('employee_id', employeeId)
+    ]);
+
+    const entitlements = entitlementsRes.data || [];
+    const requests = (requestsRes.data || []).map(mapLeaveRequestFromDb);
+
+    return LEAVE_TYPES.map((type) => {
+      const entitlement = entitlements.find((e) => e.type === type);
+      const entitlementDays = entitlement?.days ?? DEFAULT_LEAVE_QUOTAS[type] ?? 0;
+      const approvedDays = requests.filter((r) => r.type === type && r.status === 'approved').reduce((s, r) => s + r.days, 0);
+      const pendingDays = requests.filter((r) => r.type === type && r.status === 'pending').reduce((s, r) => s + r.days, 0);
+      return {
+        type,
+        entitlementDays,
+        approvedDays,
+        pendingDays,
+        remainingDays: entitlementDays - approvedDays - pendingDays
+      };
+    });
+  }
+
   await sleep(220);
   return computeBalances(employeeId);
 }
@@ -136,18 +188,39 @@ export async function createLeaveRequest(session: Session | null, input: LeaveIn
   const active = requireSession(session);
   const errors = validateLeave(input);
   if (hasErrors(errors)) throw new ValidationError(errors);
-  await sleep(360);
 
   const days = businessDaysBetween(input.startDate, input.endDate);
+  const supabase = getSupabase();
 
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .insert({
+        employee_id: active.userId,
+        type: input.type,
+        start_date: input.startDate,
+        end_date: input.endDate,
+        days,
+        reason: input.reason.trim(),
+        status: 'pending',
+        decision_note: ''
+      })
+      .select()
+      .single();
+
+    if (error || !data) throw new ConflictError(error?.message || 'Failed to submit leave request.');
+    return mapLeaveRequestFromDb(data);
+  }
+
+  await sleep(360);
   return mutate((db) => {
     const profile = getProfileOrThrow(active.userId);
 
     const clash = db.leaveRequests.find(
       (r) =>
-      r.employeeId === active.userId && (
-      r.status === 'pending' || r.status === 'approved') &&
-      datesOverlap(input.startDate, input.endDate, r.startDate, r.endDate)
+        r.employeeId === active.userId &&
+        (r.status === 'pending' || r.status === 'approved') &&
+        datesOverlap(input.startDate, input.endDate, r.startDate, r.endDate)
     );
     if (clash) {
       throw new ConflictError('These dates overlap a request you have already submitted.');
@@ -158,8 +231,8 @@ export async function createLeaveRequest(session: Session | null, input: LeaveIn
       if (balance && days > balance.remainingDays) {
         throw new ConflictError(
           `Only ${balance.remainingDays} day${balance.remainingDays === 1 ? '' : 's'} of ${LEAVE_TYPE_LABEL[
-          input.type].
-          toLowerCase()} remain this year.`
+            input.type
+          ].toLowerCase()} remain this year.`
         );
       }
     }
@@ -192,15 +265,33 @@ export async function createLeaveRequest(session: Session | null, input: LeaveIn
 }
 
 export async function decideLeaveRequest(
-session: Session | null,
-requestId: string,
-decision: 'approved' | 'rejected',
-note: string)
-: Promise<LeaveRequest> {
+  session: Session | null,
+  requestId: string,
+  decision: 'approved' | 'rejected',
+  note: string
+): Promise<LeaveRequest> {
   const active = requireAdmin(session);
   if (note.length > 300) throw new ValidationError({ decisionNote: 'Keep the note under 300 characters.' });
-  await sleep(340);
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .update({
+        status: decision,
+        decided_by: active.userId,
+        decided_at: new Date().toISOString(),
+        decision_note: note.trim()
+      })
+      .eq('id', requestId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError(error?.message || 'Leave request not found.');
+    return mapLeaveRequestFromDb(data);
+  }
+
+  await sleep(340);
   return mutate((db) => {
     const request = db.leaveRequests.find((r) => r.id === requestId);
     if (!request) throw new NotFoundError('Leave request not found.');
@@ -251,6 +342,20 @@ note: string)
 
 export async function cancelLeaveRequest(session: Session | null, requestId: string): Promise<LeaveRequest> {
   const active = requireSession(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('leave_requests')
+      .update({ status: 'cancelled' })
+      .eq('id', requestId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError('Leave request not found.');
+    return mapLeaveRequestFromDb(data);
+  }
+
   await sleep(260);
   return mutate((db) => {
     const request = db.leaveRequests.find((r) => r.id === requestId);
@@ -281,23 +386,36 @@ export async function cancelLeaveRequest(session: Session | null, requestId: str
 }
 
 export async function setEntitlement(
-session: Session | null,
-employeeId: string,
-type: LeaveType,
-days: number)
-: Promise<LeaveBalance[]> {
+  session: Session | null,
+  employeeId: string,
+  type: LeaveType,
+  days: number
+): Promise<LeaveBalance[]> {
   const active = requireAdmin(session);
   if (!Number.isFinite(days) || days < 0 || days > 365) {
     throw new ValidationError({ days: 'Entitlement must be between 0 and 365 days.' });
   }
-  await sleep(260);
+
+  const supabase = getSupabase();
   const year = new Date().getFullYear();
+
+  if (supabase) {
+    await supabase.from('leave_entitlements').upsert({
+      employee_id: employeeId,
+      year,
+      type,
+      days: Math.round(days)
+    });
+    return getLeaveBalances(session, employeeId);
+  }
+
+  await sleep(260);
   return mutate((db) => {
     const existing = db.leaveEntitlements.find(
       (e) => e.employeeId === employeeId && e.year === year && e.type === type
     );
-    if (existing) existing.days = Math.round(days);else
-    db.leaveEntitlements.push({ employeeId, year, type, days: Math.round(days) });
+    if (existing) existing.days = Math.round(days);
+    else db.leaveEntitlements.push({ employeeId, year, type, days: Math.round(days) });
     recordAudit(db, active, 'leave.entitlement_updated', 'leave_entitlement', employeeId, { type, days });
     return computeBalances(employeeId);
   });
@@ -309,8 +427,22 @@ export async function updateEmployeeEntitlements(
   entitlementsMap: Record<string, number>
 ): Promise<LeaveBalance[]> {
   const active = requireAdmin(session);
-  await sleep(300);
+  const supabase = getSupabase();
   const year = new Date().getFullYear();
+
+  if (supabase) {
+    const upsertRows = Object.entries(entitlementsMap).map(([type, days]) => ({
+      employee_id: employeeId,
+      year,
+      type,
+      days: Math.max(0, Math.min(365, Math.round(days || 0)))
+    }));
+
+    await supabase.from('leave_entitlements').upsert(upsertRows);
+    return getLeaveBalances(session, employeeId);
+  }
+
+  await sleep(300);
   return mutate((db) => {
     Object.entries(entitlementsMap).forEach(([type, days]) => {
       const parsedDays = Math.max(0, Math.min(365, Math.round(days || 0)));

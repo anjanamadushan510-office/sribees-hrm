@@ -1,12 +1,14 @@
 import type { AttendanceEntry, Presence, Profile, Session, WorkMode } from '../../types';
+import { getSupabase } from '../../lib/supabase/client';
+import { Database, mapAttendanceFromDb, mapPresenceFromDb, mapProfileFromDb } from '../../types/database.types';
 import {
   ConflictError,
   NotFoundError,
   ValidationError,
   requireAdmin,
   requireSelfOrAdmin,
-  requireSession } from
-'../policies';
+  requireSession
+} from '../policies';
 import { getDb, mutate, nowIso, sleep, uid } from '../store';
 import { todayISO, workedMinutes } from '../time';
 import { recordAudit } from './audit';
@@ -19,21 +21,46 @@ export interface AttendanceRange {
 
 export async function listAttendance(session: Session | null, range: AttendanceRange): Promise<AttendanceEntry[]> {
   requireSelfOrAdmin(session, range.employeeId);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    let query = supabase.from('attendance').select('*').eq('employee_id', range.employeeId);
+    if (range.from) query = query.gte('work_date', range.from);
+    if (range.to) query = query.lte('work_date', range.to);
+
+    const { data, error } = await query.order('work_date', { ascending: false });
+    if (error) throw new Error(error.message);
+    return ((data || []) as Database['public']['Tables']['attendance']['Row'][]).map(mapAttendanceFromDb);
+  }
+
   await sleep();
-  return getDb().
-  attendance.filter((entry) => entry.employeeId === range.employeeId).
-  filter((entry) => range.from ? entry.date >= range.from : true).
-  filter((entry) => range.to ? entry.date <= range.to : true).
-  sort((a, b) => b.date.localeCompare(a.date));
+  return getDb()
+    .attendance.filter((entry) => entry.employeeId === range.employeeId)
+    .filter((entry) => (range.from ? entry.date >= range.from : true))
+    .filter((entry) => (range.to ? entry.date <= range.to : true))
+    .sort((a, b) => b.date.localeCompare(a.date));
 }
 
 export async function getOpenShift(session: Session | null, employeeId: string): Promise<AttendanceEntry | null> {
   requireSelfOrAdmin(session, employeeId);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { data } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .is('clock_out', null)
+      .maybeSingle();
+
+    return data ? mapAttendanceFromDb(data as Database['public']['Tables']['attendance']['Row']) : null;
+  }
+
   await sleep(160);
   return (
     getDb().attendance.find((entry) => entry.employeeId === employeeId && entry.date === todayISO() && !entry.clockOut) ??
-    null);
-
+    null
+  );
 }
 
 export async function clockIn(session: Session | null, workMode: WorkMode): Promise<AttendanceEntry> {
@@ -41,8 +68,49 @@ export async function clockIn(session: Session | null, workMode: WorkMode): Prom
   if (!['office', 'remote', 'hybrid'].includes(workMode)) {
     throw new ValidationError({ workMode: 'Choose where you are working from.' });
   }
-  await sleep(300);
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const today = todayISO();
+    const { data: open } = await supabase
+      .from('attendance')
+      .select('id')
+      .eq('employee_id', active.userId)
+      .is('clock_out', null)
+      .maybeSingle();
+
+    if (open) throw new ConflictError('You are already clocked in.');
+
+    const insertPayload: Database['public']['Tables']['attendance']['Insert'] = {
+      employee_id: active.userId,
+      work_date: today,
+      clock_in: new Date().toISOString(),
+      work_mode: workMode,
+      break_minutes: 0,
+      note: ''
+    };
+
+    const { data: entryRow, error } = await supabase
+      .from('attendance')
+      .insert(insertPayload as any)
+      .select()
+      .single();
+
+    if (error || !entryRow) throw new ConflictError(error?.message || 'Failed to clock in.');
+
+    const presencePayload: Database['public']['Tables']['presence']['Insert'] = {
+      employee_id: active.userId,
+      status: 'working',
+      work_mode: workMode,
+      updated_at: new Date().toISOString()
+    };
+
+    await supabase.from('presence').upsert(presencePayload as any);
+
+    return mapAttendanceFromDb(entryRow as Database['public']['Tables']['attendance']['Row']);
+  }
+
+  await sleep(300);
   return mutate((db) => {
     const today = todayISO();
     const open = db.attendance.find((e) => e.employeeId === active.userId && !e.clockOut);
@@ -77,8 +145,46 @@ export async function clockOut(session: Session | null, breakMinutes: number, no
   if (breakMinutes > 480) errors.breakMinutes = 'Break minutes look too high.';
   if (note.length > 280) errors.note = 'Keep the note under 280 characters.';
   if (Object.keys(errors).length > 0) throw new ValidationError(errors);
-  await sleep(300);
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data: openShift } = await supabase
+      .from('attendance')
+      .select('*')
+      .eq('employee_id', active.userId)
+      .is('clock_out', null)
+      .maybeSingle();
+
+    if (!openShift) throw new ConflictError('You are not currently clocked in.');
+
+    const updatePayload: Database['public']['Tables']['attendance']['Update'] = {
+      clock_out: new Date().toISOString(),
+      break_minutes: Math.round(breakMinutes),
+      note: note.trim()
+    };
+
+    const { data: updated, error } = await supabase
+      .from('attendance')
+      .update(updatePayload as any)
+      .eq('id', (openShift as Database['public']['Tables']['attendance']['Row']).id)
+      .select()
+      .single();
+
+    if (error || !updated) throw new ConflictError(error?.message || 'Failed to clock out.');
+
+    const presencePayload: Database['public']['Tables']['presence']['Insert'] = {
+      employee_id: active.userId,
+      status: 'off_shift',
+      work_mode: (updated as Database['public']['Tables']['attendance']['Row']).work_mode,
+      updated_at: new Date().toISOString()
+    };
+
+    await supabase.from('presence').upsert(presencePayload as any);
+
+    return mapAttendanceFromDb(updated as Database['public']['Tables']['attendance']['Row']);
+  }
+
+  await sleep(300);
   return mutate((db) => {
     const entry = db.attendance.find((e) => e.employeeId === active.userId && !e.clockOut);
     if (!entry) throw new ConflictError('You are not currently clocked in.');
@@ -106,6 +212,29 @@ export async function setPresence(session: Session | null, status: Presence['sta
   if (!['working', 'on_break', 'off_shift', 'on_leave'].includes(status)) {
     throw new ValidationError({ status: 'Unknown status.' });
   }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data: profile } = await supabase.from('profiles').select('work_mode').eq('id', active.userId).single();
+    const workMode = (profile as Database['public']['Tables']['profiles']['Row'] | null)?.work_mode || 'office';
+
+    const presencePayload: Database['public']['Tables']['presence']['Insert'] = {
+      employee_id: active.userId,
+      status,
+      work_mode: workMode,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: updated, error } = await supabase
+      .from('presence')
+      .upsert(presencePayload as any)
+      .select()
+      .single();
+
+    if (error || !updated) throw new Error(error?.message || 'Failed to update presence.');
+    return mapPresenceFromDb(updated as Database['public']['Tables']['presence']['Row']);
+  }
+
   await sleep(180);
   return mutate((db) => {
     const profile = db.profiles.find((p) => p.id === active.userId);
@@ -122,6 +251,29 @@ export async function setPresence(session: Session | null, status: Presence['sta
 
 export async function setWorkMode(session: Session | null, workMode: WorkMode): Promise<Presence> {
   const active = requireSession(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { data: existing } = await supabase.from('presence').select('status').eq('employee_id', active.userId).maybeSingle();
+    const currentStatus = (existing as Database['public']['Tables']['presence']['Row'] | null)?.status || 'off_shift';
+
+    const presencePayload: Database['public']['Tables']['presence']['Insert'] = {
+      employee_id: active.userId,
+      status: currentStatus,
+      work_mode: workMode,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: updated, error } = await supabase
+      .from('presence')
+      .upsert(presencePayload as any)
+      .select()
+      .single();
+
+    if (error || !updated) throw new Error(error?.message || 'Failed to update work mode.');
+    return mapPresenceFromDb(updated as Database['public']['Tables']['presence']['Row']);
+  }
+
   await sleep(180);
   return mutate((db) => {
     const presence = db.presence.find((p) => p.employeeId === active.userId);
@@ -143,41 +295,94 @@ export interface PresenceRow {
 /** Live remote-workforce board. Any signed-in user can see who is available. */
 export async function listPresence(session: Session | null): Promise<PresenceRow[]> {
   requireSession(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const today = todayISO();
+    const [profilesRes, presenceRes, attendanceRes] = await Promise.all([
+      supabase.from('profiles').select('*').eq('status', 'active'),
+      supabase.from('presence').select('*'),
+      supabase.from('attendance').select('*').eq('work_date', today)
+    ]);
+
+    const profiles = ((profilesRes.data || []) as Database['public']['Tables']['profiles']['Row'][]).map(mapProfileFromDb);
+    const presences = ((presenceRes.data || []) as Database['public']['Tables']['presence']['Row'][]).map(mapPresenceFromDb);
+    const attendances = ((attendanceRes.data || []) as Database['public']['Tables']['attendance']['Row'][]).map(mapAttendanceFromDb);
+
+    return profiles
+      .map((profile: Profile) => {
+        const presence = presences.find((p) => p.employeeId === profile.id) ?? {
+          employeeId: profile.id,
+          status: 'off_shift' as const,
+          workMode: profile.workMode,
+          updatedAt: profile.createdAt
+        };
+        const todays = attendances.filter((e) => e.employeeId === profile.id);
+        const open = todays.find((e) => !e.clockOut);
+        return {
+          profile,
+          presence,
+          openSince: open ? open.clockIn : null,
+          todayMinutes: todays.reduce((sum, entry) => sum + workedMinutes(entry), 0)
+        };
+      })
+      .sort((a, b) => a.profile.fullName.localeCompare(b.profile.fullName));
+  }
+
   await sleep(240);
   const db = getDb();
   const today = todayISO();
-  return db.profiles.
-  filter((p) => p.status === 'active').
-  map((profile) => {
-    const presence = db.presence.find((p) => p.employeeId === profile.id) ?? {
-      employeeId: profile.id,
-      status: 'off_shift' as const,
-      workMode: profile.workMode,
-      updatedAt: profile.createdAt
-    };
-    const todays = db.attendance.filter((e) => e.employeeId === profile.id && e.date === today);
-    const open = todays.find((e) => !e.clockOut);
-    return {
-      profile,
-      presence,
-      openSince: open ? open.clockIn : null,
-      todayMinutes: todays.reduce((sum, entry) => sum + workedMinutes(entry), 0)
-    };
-  }).
-  sort((a, b) => a.profile.fullName.localeCompare(b.profile.fullName));
+  return db.profiles
+    .filter((p) => p.status === 'active')
+    .map((profile) => {
+      const presence = db.presence.find((p) => p.employeeId === profile.id) ?? {
+        employeeId: profile.id,
+        status: 'off_shift' as const,
+        workMode: profile.workMode,
+        updatedAt: profile.createdAt
+      };
+      const todays = db.attendance.filter((e) => e.employeeId === profile.id && e.date === today);
+      const open = todays.find((e) => !e.clockOut);
+      return {
+        profile,
+        presence,
+        openSince: open ? open.clockIn : null,
+        todayMinutes: todays.reduce((sum, entry) => sum + workedMinutes(entry), 0)
+      };
+    })
+    .sort((a, b) => a.profile.fullName.localeCompare(b.profile.fullName));
 }
 
 /** HR correction of a historical entry, always audited. */
 export async function amendAttendance(
-session: Session | null,
-entryId: string,
-breakMinutes: number,
-note: string)
-: Promise<AttendanceEntry> {
+  session: Session | null,
+  entryId: string,
+  breakMinutes: number,
+  note: string
+): Promise<AttendanceEntry> {
   const active = requireAdmin(session);
   if (breakMinutes < 0 || breakMinutes > 480) {
     throw new ValidationError({ breakMinutes: 'Break minutes must be between 0 and 480.' });
   }
+
+  const supabase = getSupabase();
+  if (supabase) {
+    const updatePayload: Database['public']['Tables']['attendance']['Update'] = {
+      break_minutes: Math.round(breakMinutes),
+      note: note.trim()
+    };
+
+    const { data, error } = await supabase
+      .from('attendance')
+      .update(updatePayload as any)
+      .eq('id', entryId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError('Attendance entry not found.');
+    return mapAttendanceFromDb(data as Database['public']['Tables']['attendance']['Row']);
+  }
+
   await sleep(260);
   return mutate((db) => {
     const entry = db.attendance.find((e) => e.id === entryId);
@@ -195,11 +400,11 @@ note: string)
 }
 
 function upsertPresence(
-rows: Presence[],
-employeeId: string,
-status: Presence['status'],
-workMode: WorkMode)
-: Presence {
+  rows: Presence[],
+  employeeId: string,
+  status: Presence['status'],
+  workMode: WorkMode
+): Presence {
   const existing = rows.find((p) => p.employeeId === employeeId);
   if (existing) {
     existing.status = status;

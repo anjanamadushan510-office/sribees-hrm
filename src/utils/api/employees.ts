@@ -1,4 +1,6 @@
 import type { EmploymentStatus, Invitation, Profile, Role, Session, WorkMode } from '../../types';
+import { getSupabase } from '../../lib/supabase/client';
+import { mapInvitationFromDb, mapProfileFromDb } from '../../types/database.types';
 import {
   ConflictError,
   ForbiddenError,
@@ -9,8 +11,8 @@ import {
   redactProfile,
   requireAdmin,
   requireSelfOrAdmin,
-  requireSession } from
-'../policies';
+  requireSession
+} from '../policies';
 import { getDb, mutate, nowIso, sleep, uid } from '../store';
 import { hasErrors, validateInvite, validateProfile } from '../validation';
 import type { InviteInput, ProfileInput } from '../validation';
@@ -26,37 +28,92 @@ export interface EmployeeFilter {
 
 export async function listEmployees(session: Session | null, filter: EmployeeFilter = {}): Promise<Profile[]> {
   const active = requireSession(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    let query = supabase.from('profiles').select('*');
+    if (filter.department && filter.department !== 'all') {
+      query = query.eq('department', filter.department);
+    }
+    if (filter.status && filter.status !== 'all') {
+      query = query.eq('status', filter.status);
+    }
+    if (filter.workMode && filter.workMode !== 'all') {
+      query = query.eq('work_mode', filter.workMode);
+    }
+    if (filter.search?.trim()) {
+      const search = filter.search.trim();
+      query = query.or(`full_name.ilike.%${search}%,email.ilike.%${search}%,job_title.ilike.%${search}%,department.ilike.%${search}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw new Error(error.message);
+
+    return (data || [])
+      .map(mapProfileFromDb)
+      .map((p) => redactProfile(active, p))
+      .sort((a, b) => a.fullName.localeCompare(b.fullName));
+  }
+
   await sleep();
   const search = filter.search?.trim().toLowerCase() ?? '';
-  return getDb().
-  profiles.filter((p) => filter.department && filter.department !== 'all' ? p.department === filter.department : true).
-  filter((p) => filter.status && filter.status !== 'all' ? p.status === filter.status : true).
-  filter((p) => filter.workMode && filter.workMode !== 'all' ? p.workMode === filter.workMode : true).
-  filter((p) =>
-  search ? `${p.fullName} ${p.email} ${p.jobTitle} ${p.department}`.toLowerCase().includes(search) : true
-  ).
-  map((p) => redactProfile(active, p)).
-  sort((a, b) => a.fullName.localeCompare(b.fullName));
+  return getDb()
+    .profiles.filter((p) => (filter.department && filter.department !== 'all' ? p.department === filter.department : true))
+    .filter((p) => (filter.status && filter.status !== 'all' ? p.status === filter.status : true))
+    .filter((p) => (filter.workMode && filter.workMode !== 'all' ? p.workMode === filter.workMode : true))
+    .filter((p) => (search ? `${p.fullName} ${p.email} ${p.jobTitle} ${p.department}`.toLowerCase().includes(search) : true))
+    .map((p) => redactProfile(active, p))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName));
 }
 
 export async function getEmployee(session: Session | null, employeeId: string): Promise<Profile> {
   const active = requireSession(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', employeeId).single();
+    if (error || !data) throw new NotFoundError('Employee not found.');
+    return redactProfile(active, mapProfileFromDb(data));
+  }
+
   await sleep(200);
   return redactProfile(active, getProfileOrThrow(employeeId));
 }
 
 /** Employees may edit a whitelisted subset of their own row; HR may edit any row. */
 export async function updateEmployeeProfile(
-session: Session | null,
-employeeId: string,
-input: ProfileInput)
-: Promise<Profile> {
+  session: Session | null,
+  employeeId: string,
+  input: ProfileInput
+): Promise<Profile> {
   const active = requireSelfOrAdmin(session, employeeId);
   assertProfileFieldsAllowed(active, employeeId, Object.keys(input));
   const errors = validateProfile(input);
   if (hasErrors(errors)) throw new ValidationError(errors);
-  await sleep();
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const updatePayload: Record<string, any> = {
+      phone: input.phone.trim(),
+      location: input.location.trim(),
+      timezone: input.timezone.trim(),
+      emergency_contact: input.emergencyContact.trim(),
+      updated_at: new Date().toISOString()
+    };
+    if (input.workMode) updatePayload.work_mode = input.workMode;
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updatePayload)
+      .eq('id', employeeId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError('Employee profile update failed: ' + (error?.message || 'Not found'));
+    return redactProfile(active, mapProfileFromDb(data));
+  }
+
+  await sleep();
   return mutate((db) => {
     const profile = db.profiles.find((p) => p.id === employeeId);
     if (!profile) throw new NotFoundError('Employee not found.');
@@ -80,10 +137,10 @@ export interface EmploymentInput {
 
 /** HR-only fields: job, department, work mode, role, reporting line. */
 export async function updateEmployment(
-session: Session | null,
-employeeId: string,
-input: EmploymentInput)
-: Promise<Profile> {
+  session: Session | null,
+  employeeId: string,
+  input: EmploymentInput
+): Promise<Profile> {
   const active = requireAdmin(session);
   const errors: Record<string, string> = {};
   if (!input.jobTitle.trim()) errors.jobTitle = 'Job title is required.';
@@ -91,13 +148,42 @@ input: EmploymentInput)
   if (!['office', 'remote', 'hybrid'].includes(input.workMode)) errors.workMode = 'Choose a work mode.';
   if (!['admin', 'employee'].includes(input.role)) errors.role = 'Choose a valid role.';
   if (hasErrors(errors)) throw new ValidationError(errors);
-  await sleep();
 
+  const supabase = getSupabase();
+  if (supabase) {
+    if (input.managerId === employeeId) throw new ValidationError({ managerId: 'Someone cannot manage themselves.' });
+
+    const updatePayload = {
+      job_title: input.jobTitle.trim(),
+      department: input.department.trim(),
+      work_mode: input.workMode,
+      role: input.role,
+      manager_id: input.managerId,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data, error } = await supabase
+      .from('profiles')
+      .update(updatePayload)
+      .eq('id', employeeId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError(error?.message || 'Employee not found.');
+
+    await supabase
+      .from('presence')
+      .update({ work_mode: input.workMode, updated_at: new Date().toISOString() })
+      .eq('employee_id', employeeId);
+
+    return mapProfileFromDb(data);
+  }
+
+  await sleep();
   return mutate((db) => {
     const profile = db.profiles.find((p) => p.id === employeeId);
     if (!profile) throw new NotFoundError('Employee not found.');
 
-    // Guard against locking the organisation out of HR entirely.
     if (profile.role === 'admin' && input.role !== 'admin') {
       const remainingAdmins = db.profiles.filter(
         (p) => p.role === 'admin' && p.status === 'active' && p.id !== employeeId
@@ -136,14 +222,33 @@ input: EmploymentInput)
 }
 
 export async function setEmployeeStatus(
-session: Session | null,
-employeeId: string,
-status: EmploymentStatus)
-: Promise<Profile> {
+  session: Session | null,
+  employeeId: string,
+  status: EmploymentStatus
+): Promise<Profile> {
   const active = requireAdmin(session);
   if (active.userId === employeeId) throw new ForbiddenError('You cannot change your own account status.');
-  await sleep();
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('profiles')
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq('id', employeeId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError(error?.message || 'Employee not found.');
+    if (status !== 'active') {
+      await supabase
+        .from('presence')
+        .update({ status: 'off_shift', updated_at: new Date().toISOString() })
+        .eq('employee_id', employeeId);
+    }
+    return mapProfileFromDb(data);
+  }
+
+  await sleep();
   return mutate((db) => {
     const profile = db.profiles.find((p) => p.id === employeeId);
     if (!profile) throw new NotFoundError('Employee not found.');
@@ -165,23 +270,79 @@ status: EmploymentStatus)
 
 export async function listInvitations(session: Session | null): Promise<Invitation[]> {
   requireAdmin(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { data, error } = await supabase
+      .from('invitations')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) throw new Error(error.message);
+    const now = Date.now();
+    return (data || []).map((row) => {
+      const invite = mapInvitationFromDb(row);
+      if (invite.status === 'pending' && new Date(invite.expiresAt).getTime() < now) {
+        return { ...invite, status: 'expired' as const };
+      }
+      return invite;
+    });
+  }
+
   await sleep(220);
   const now = Date.now();
-  return getDb().
-  invitations.map((invite) =>
-  invite.status === 'pending' && new Date(invite.expiresAt).getTime() < now ?
-  { ...invite, status: 'expired' as const } :
-  invite
-  ).
-  sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return getDb()
+    .invitations.map((invite) =>
+      invite.status === 'pending' && new Date(invite.expiresAt).getTime() < now
+        ? { ...invite, status: 'expired' as const }
+        : invite
+    )
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function inviteEmployee(session: Session | null, input: InviteInput): Promise<Invitation> {
   const active = requireAdmin(session);
   const errors = validateInvite(input);
   if (hasErrors(errors)) throw new ValidationError(errors);
-  await sleep(380);
 
+  const supabase = getSupabase();
+  if (supabase) {
+    const email = input.email.trim().toLowerCase();
+    const defaultPassword = input.defaultPassword?.trim() || 'Sribees@2026';
+
+    const { data: existingProfile } = await supabase.from('profiles').select('id').eq('email', email).maybeSingle();
+    if (existingProfile) throw new ConflictError('Someone with that email already has an account.');
+
+    const tokenHash = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const expiresAt = new Date(Date.now() + 7 * 86400_000).toISOString();
+
+    const { data: inviteRow, error: inviteError } = await supabase
+      .from('invitations')
+      .insert({
+        email,
+        full_name: input.fullName.trim(),
+        role: input.role,
+        job_title: input.jobTitle.trim(),
+        department: input.department.trim(),
+        work_mode: input.workMode,
+        token_hash: tokenHash,
+        status: 'pending',
+        invited_by: active.userId,
+        expires_at: expiresAt
+      })
+      .select()
+      .single();
+
+    if (inviteError || !inviteRow) {
+      throw new ConflictError(inviteError?.message || 'Failed to create invitation record.');
+    }
+
+    const invitation = mapInvitationFromDb(inviteRow);
+    invitation.defaultPassword = defaultPassword;
+    return invitation;
+  }
+
+  await sleep(380);
   const email = input.email.trim().toLowerCase();
   const defaultPassword = input.defaultPassword?.trim() || 'Sribees@2026';
   const year = new Date().getFullYear();
@@ -262,6 +423,18 @@ export async function inviteEmployee(session: Session | null, input: InviteInput
 
 export async function revokeInvitation(session: Session | null, invitationId: string): Promise<void> {
   const active = requireAdmin(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const { error } = await supabase
+      .from('invitations')
+      .update({ status: 'revoked' })
+      .eq('id', invitationId);
+
+    if (error) throw new NotFoundError('Invitation update failed: ' + error.message);
+    return;
+  }
+
   await sleep(240);
   mutate((db) => {
     const invitation = db.invitations.find((i) => i.id === invitationId);
@@ -274,6 +447,23 @@ export async function revokeInvitation(session: Session | null, invitationId: st
 
 export async function resendInvitation(session: Session | null, invitationId: string): Promise<Invitation> {
   const active = requireAdmin(session);
+  const supabase = getSupabase();
+
+  if (supabase) {
+    const newToken = Math.random().toString(36).substring(2) + Date.now().toString(36);
+    const expiresAt = new Date(Date.now() + 7 * 86400_000).toISOString();
+
+    const { data, error } = await supabase
+      .from('invitations')
+      .update({ status: 'pending', token_hash: newToken, expires_at: expiresAt })
+      .eq('id', invitationId)
+      .select()
+      .single();
+
+    if (error || !data) throw new NotFoundError('Invitation update failed: ' + (error?.message || 'Not found'));
+    return mapInvitationFromDb(data);
+  }
+
   await sleep(300);
   return mutate((db) => {
     const invitation = db.invitations.find((i) => i.id === invitationId);
@@ -288,6 +478,19 @@ export async function resendInvitation(session: Session | null, invitationId: st
 }
 
 export async function findInvitationByToken(token: string): Promise<Invitation> {
+  const supabase = getSupabase();
+  if (supabase) {
+    const { data, error } = await supabase.from('invitations').select('*').eq('token_hash', token).single();
+    if (error || !data) throw new NotFoundError('This invitation link is not valid.');
+    const invitation = mapInvitationFromDb(data);
+    if (invitation.status === 'accepted') throw new ConflictError('This invitation has already been used.');
+    if (invitation.status === 'revoked') throw new ConflictError('This invitation was revoked by HR.');
+    if (new Date(invitation.expiresAt).getTime() < Date.now()) {
+      throw new ConflictError('This invitation has expired. Ask HR to send a new one.');
+    }
+    return invitation;
+  }
+
   await sleep(240);
   const invitation = getDb().invitations.find((i) => i.token === token);
   if (!invitation) throw new NotFoundError('This invitation link is not valid.');
@@ -299,16 +502,23 @@ export async function findInvitationByToken(token: string): Promise<Invitation> 
   return invitation;
 }
 
-/**
- * Accepting an invitation is unauthenticated by design — the single-use token is
- * the credential, and the role always comes from the invitation row, never from
- * anything the browser submits.
- */
 export async function acceptInvitation(token: string, password: string, confirm: string): Promise<void> {
   const errors: Record<string, string> = {};
   if (password.length < 8) errors.password = 'Choose a password with at least 8 characters.';
   if (password !== confirm) errors.confirm = 'Passwords do not match.';
   if (hasErrors(errors)) throw new ValidationError(errors);
+
+  const supabase = getSupabase();
+  if (supabase) {
+    const { error: rpcError } = await supabase.rpc('accept_invitation', {
+      p_token_hash: token,
+      p_password: password
+    });
+    if (rpcError) {
+      throw new ConflictError(rpcError.message);
+    }
+    return;
+  }
 
   const invitation = await findInvitationByToken(token);
   await sleep(420);

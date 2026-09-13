@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import type { Profile, Session } from '../types';
+import { getSupabase } from '../lib/supabase/client';
 import { restoreSession, signIn as signInService, signOut as signOutService } from '../utils/api/auth';
 import { getEmployee } from '../utils/api/employees';
 
@@ -19,29 +20,65 @@ interface AuthValue {
 
 const AuthContext = createContext<AuthValue | null>(null);
 
-export function AuthProvider({ children }: {children: React.ReactNode;}) {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('loading');
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    restoreSession().
-    then((restored) => {
-      if (cancelled) return;
-      if (restored) {
-        setSession(restored.session);
-        setProfile(restored.profile);
-        setStatus('authenticated');
-      } else {
-        setStatus('anonymous');
+
+    const initAuth = async () => {
+      try {
+        const restored = await restoreSession();
+        if (cancelled) return;
+        if (restored) {
+          setSession(restored.session);
+          setProfile(restored.profile);
+          setStatus('authenticated');
+        } else {
+          setSession(null);
+          setProfile(null);
+          setStatus('anonymous');
+        }
+      } catch {
+        if (!cancelled) {
+          setSession(null);
+          setProfile(null);
+          setStatus('anonymous');
+        }
       }
-    }).
-    catch(() => {
-      if (!cancelled) setStatus('anonymous');
-    });
+    };
+
+    initAuth();
+
+    const supabase = getSupabase();
+    let authListener: { unsubscribe: () => void } | null = null;
+
+    if (supabase) {
+      const { data: listener } = supabase.auth.onAuthStateChange((event) => {
+        if (event === 'SIGNED_OUT') {
+          setSession(null);
+          setProfile(null);
+          setStatus('anonymous');
+        } else if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+          restoreSession().then((restored) => {
+            if (restored && !cancelled) {
+              setSession(restored.session);
+              setProfile(restored.profile);
+              setStatus('authenticated');
+            }
+          });
+        }
+      });
+      authListener = listener.subscription;
+    }
+
     return () => {
       cancelled = true;
+      if (authListener) {
+        authListener.unsubscribe();
+      }
     };
   }, []);
 
