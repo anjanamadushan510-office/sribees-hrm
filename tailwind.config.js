@@ -14,8 +14,8 @@ export default {
       colors: {
         canvas: '#FCF9EA',
         surface: '#ffffff',
-        sidebar: '#FF9644',
-        navbar: '#FF9644',
+        sidebar: '#FE7743',
+        navbar: '#FE7743',
         line: '#e5e0cf',
         ink: {
           DEFAULT: '#1c1b18',

@@ -61,9 +61,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             href={item.to}
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium',
+              'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-semibold',
               'transition-colors duration-150 ease-out',
-              isActive ? 'bg-white text-brand-900 font-semibold shadow-sm' : 'text-white/90 hover:bg-white/15 hover:text-white'
+              isActive ? 'bg-white text-brand-900 font-bold shadow-sm' : 'text-white hover:bg-white/20 hover:text-white'
             )}
           >
             <item.icon className="h-4 w-4 shrink-0" />
@@ -76,7 +76,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-full w-full bg-canvas">
-      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-line bg-sidebar px-3 py-4 lg:flex">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col bg-sidebar px-3 py-4 lg:flex">
         <Brand />
         <div className="mt-6 flex-1">{nav}</div>
         <AccountCard onSignOut={handleSignOut} />
@@ -168,19 +168,19 @@ function AccountCard({ onSignOut }: { onSignOut: () => void }) {
     <div className="mt-4 border-t border-white/20 pt-3">
       <Link
         href="/profile"
-        className="flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 ease-out hover:bg-white/15 text-white"
+        className="flex items-center gap-2.5 rounded-md px-2 py-2 transition-colors duration-150 ease-out hover:bg-white/20 text-white"
       >
         <Avatar name={profile.fullName} size="sm" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-medium text-white">{profile.fullName}</span>
-          <span className="block truncate text-[12px] text-white/80">{isAdmin ? 'HR administrator' : 'Employee'}</span>
+          <span className="block truncate text-[13px] font-semibold text-white">{profile.fullName}</span>
+          <span className="block truncate text-[12px] font-medium text-white">{isAdmin ? 'HR administrator' : 'Employee'}</span>
         </span>
-        <UserIcon className="h-3.5 w-3.5 text-white/70" />
+        <UserIcon className="h-3.5 w-3.5 text-white" />
       </Link>
       <button
         type="button"
         onClick={onSignOut}
-        className="mt-1 flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-medium text-white/90 transition-colors duration-150 ease-out hover:bg-white/15 hover:text-white"
+        className="mt-1 flex w-full items-center gap-2.5 rounded-md px-3 py-2 text-sm font-semibold text-white transition-colors duration-150 ease-out hover:bg-white/20 hover:text-white"
       >
         <LogOutIcon className="h-4 w-4" />
         Sign out

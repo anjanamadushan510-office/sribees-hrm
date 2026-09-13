@@ -127,7 +127,7 @@ export function EmployeeDashboard() {
                 </CardBody>
               </Card>
 
-              <Card>
+{/*               <Card>
                 <CardHeader title="Coming up" />
                 {stats.upcomingLeave.length === 0 ?
               <EmptyState
@@ -160,7 +160,7 @@ export function EmployeeDashboard() {
                     See who
                   </Link>
                 </CardBody>
-              </Card>
+              </Card> */}
             </div>
           </div>
         }

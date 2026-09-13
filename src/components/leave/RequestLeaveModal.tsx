@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import type { LeaveBalance, LeaveType } from '../../types';
 import { useAuth } from '../../contexts/AuthContext';
-import { createLeaveRequest, LEAVE_TYPES, LEAVE_TYPE_LABEL } from '../../utils/api/leave';
+import { createLeaveRequest, LEAVE_TYPES, LEAVE_TYPE_LABEL, LEAVE_TYPE_DESCRIPTIONS } from '../../utils/api/leave';
 import { businessDaysBetween, todayISO } from '../../utils/time';
 import { ValidationError, toMessage } from '../../utils/policies';
 import { hasErrors, validateLeave } from '../../utils/validation';
@@ -19,7 +19,7 @@ interface Props {
 
 export function RequestLeaveModal({ open, onClose, onSuccess, balances }: Props) {
   const { session } = useAuth();
-  const [type, setType] = useState<LeaveType>('annual');
+  const [type, setType] = useState<LeaveType>('casual');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [reason, setReason] = useState('');
@@ -55,8 +55,14 @@ export function RequestLeaveModal({ open, onClose, onSuccess, balances }: Props)
     setErrors({});
     setFormError(null);
     try {
-      await createLeaveRequest(session, input);
-      toast.success('Request submitted. HR has been notified.');
+      const createdRequest = await createLeaveRequest(session, input);
+      const directLink = `${window.location.origin}/leave?request=${createdRequest.id}`;
+      try {
+        await navigator.clipboard.writeText(directLink);
+        toast.success('Request submitted & link copied to clipboard! Send this link to HR for approval.');
+      } catch {
+        toast.success('Request submitted. HR has been notified.');
+      }
       reset();
       onClose();
       onSuccess();
@@ -113,6 +119,13 @@ export function RequestLeaveModal({ open, onClose, onSuccess, balances }: Props)
             </option>
           )}
         </SelectField>
+
+        {LEAVE_TYPE_DESCRIPTIONS[type] ? (
+          <div className="rounded-md border border-brand-200 bg-brand-50/70 px-3 py-2 text-[12px] text-brand-900">
+            <span className="font-semibold">Guideline: </span>
+            {LEAVE_TYPE_DESCRIPTIONS[type]}
+          </div>
+        ) : null}
 
         <div className="grid gap-4 sm:grid-cols-2">
           <TextField

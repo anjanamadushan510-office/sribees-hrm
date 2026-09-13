@@ -193,10 +193,14 @@ function buildLeave(profiles: Profile[]): {requests: LeaveRequest[];entitlements
   const entitlements: LeaveEntitlement[] = [];
   profiles.forEach((p) => {
     entitlements.push(
-      { employeeId: p.id, year, type: 'annual', days: 25 },
-      { employeeId: p.id, year, type: 'sick', days: 10 },
-      { employeeId: p.id, year, type: 'parental', days: 20 },
-      { employeeId: p.id, year, type: 'unpaid', days: 15 }
+      { employeeId: p.id, year, type: 'casual', days: 7 },
+      { employeeId: p.id, year, type: 'sick', days: 7 },
+      { employeeId: p.id, year, type: 'half_day', days: 4 },
+      { employeeId: p.id, year, type: 'birthday', days: 1 },
+      { employeeId: p.id, year, type: 'lieu', days: 5 },
+      { employeeId: p.id, year, type: 'unpaid', days: 15 },
+      { employeeId: p.id, year, type: 'annual', days: 14 },
+      { employeeId: p.id, year, type: 'parental', days: 30 }
     );
   });
 

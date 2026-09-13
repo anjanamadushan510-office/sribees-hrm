@@ -1,9 +1,7 @@
-'use client';
-
 import React, { useCallback, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { toast } from 'sonner';
-import { CopyIcon, SearchIcon, UserPlusIcon, UsersIcon } from 'lucide-react';
+import { Building2Icon, CopyIcon, SearchIcon, UserPlusIcon, UsersIcon } from 'lucide-react';
 import type { EmploymentStatus, WorkMode } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { useAsync } from '../hooks/useAsync';
@@ -14,6 +12,7 @@ import {
   resendInvitation,
   revokeInvitation } from
 '../utils/api/employees';
+import { listManagedDepartments } from '../utils/api/departments';
 import { toMessage } from '../utils/policies';
 import { Card, CardBody, CardHeader } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -21,15 +20,17 @@ import { AsyncBoundary, EmptyState } from '../components/ui/States';
 import { Avatar } from '../components/ui/Avatar';
 import { Badge, EmploymentBadge, WorkModeBadge } from '../components/ui/Badge';
 import { InviteModal } from '../components/employees/InviteModal';
-import { formatDate, relativeTime } from '../utils/time';
+import { ManageDepartmentsModal } from '../components/departments/ManageDepartmentsModal';
+import { formatDate } from '../utils/time';
 
 export function Employees() {
-  const { session } = useAuth();
+  const { session, isAdmin } = useAuth();
   const [search, setSearch] = useState('');
   const [department, setDepartment] = useState('all');
   const [status, setStatus] = useState<EmploymentStatus | 'all'>('all');
   const [workMode, setWorkMode] = useState<WorkMode | 'all'>('all');
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [manageDeptsOpen, setManageDeptsOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const employeesLoader = useCallback(
@@ -41,8 +42,20 @@ export function Employees() {
   const invitationsLoader = useCallback(() => listInvitations(session), [session]);
   const invitations = useAsync(invitationsLoader, [session?.userId]);
 
-  const departments = useMemo(() => departmentsOf(employees.data ?? []), [employees.data]);
+  const managedDeptsLoader = useCallback(() => listManagedDepartments(session), [session]);
+  const managedDepts = useAsync(managedDeptsLoader, [session?.userId]);
+
+  const departments = useMemo(
+    () => Array.from(new Set([...(managedDepts.data ?? []), ...departmentsOf(employees.data ?? [])])).sort(),
+    [managedDepts.data, employees.data]
+  );
   const pendingInvites = (invitations.data ?? []).filter((invite) => invite.status === 'pending');
+
+  const refreshAll = () => {
+    employees.reload();
+    invitations.reload();
+    managedDepts.reload();
+  };
 
   const copyLink = async (token: string) => {
     const link = `${window.location.origin}/invite/${token}`;
@@ -101,9 +114,20 @@ export function Employees() {
             Manage employment records, access levels and invitations.
           </p>
         </div>
-        <Button icon={<UserPlusIcon className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
-          Invite employee
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          {isAdmin ? (
+            <Button
+              variant="secondary"
+              icon={<Building2Icon className="h-4 w-4" />}
+              onClick={() => setManageDeptsOpen(true)}
+            >
+              Manage Departments
+            </Button>
+          ) : null}
+          <Button icon={<UserPlusIcon className="h-4 w-4" />} onClick={() => setInviteOpen(true)}>
+            Invite employee
+          </Button>
+        </div>
       </header>
 
       {pendingInvites.length > 0 ?
@@ -244,10 +268,15 @@ export function Employees() {
         onClose={() => setInviteOpen(false)}
         departments={departments}
         onSuccess={(link) => {
-          invitations.reload();
+          refreshAll();
           toast.message('Invitation link', { description: link });
         }} />
-      
+
+      <ManageDepartmentsModal
+        open={manageDeptsOpen}
+        onClose={() => setManageDeptsOpen(false)}
+        onSuccess={refreshAll}
+      />
     </div>);
 
 }

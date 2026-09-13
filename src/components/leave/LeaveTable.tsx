@@ -1,16 +1,20 @@
 import React from 'react';
+import { toast } from 'sonner';
+import { CopyIcon } from 'lucide-react';
 import type { LeaveRequestRow } from '../../utils/api/leave';
 import { LEAVE_TYPE_LABEL } from '../../utils/api/leave';
 import { formatDate, relativeTime, todayISO } from '../../utils/time';
 import { Avatar } from '../ui/Avatar';
 import { Button } from '../ui/Button';
 import { LeaveBadge } from '../ui/Badge';
+import { cn } from '../../utils/cn';
 
 interface Props {
   rows: LeaveRequestRow[];
   showEmployee: boolean;
   currentUserId: string;
   isAdmin: boolean;
+  highlightedRequestId?: string | null;
   onDecide?: (row: LeaveRequestRow, decision: 'approved' | 'rejected') => void;
   onCancel?: (row: LeaveRequestRow) => void;
   cancellingId?: string | null;
@@ -21,11 +25,22 @@ export function LeaveTable({
   showEmployee,
   currentUserId,
   isAdmin,
+  highlightedRequestId,
   onDecide,
   onCancel,
   cancellingId
 }: Props) {
   const today = todayISO();
+
+  const handleCopyLink = async (requestId: string) => {
+    const link = `${window.location.origin}/leave?request=${requestId}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast.success('Direct leave link copied to clipboard!');
+    } catch {
+      toast.message('Direct leave link', { description: link });
+    }
+  };
 
   return (
     <div className="overflow-x-auto">
@@ -51,9 +66,17 @@ export function LeaveTable({
             const canCancel =
             isOwn && (row.status === 'pending' || row.status === 'approved' && row.startDate > today) ||
             isAdmin && (row.status === 'pending' || row.status === 'approved');
+            const isHighlighted = highlightedRequestId === row.id;
 
             return (
-              <tr key={row.id} className="border-b border-line align-top last:border-b-0">
+              <tr
+                key={row.id}
+                id={`leave-row-${row.id}`}
+                className={cn(
+                  'border-b border-line align-top last:border-b-0 transition-colors',
+                  isHighlighted ? 'bg-brand-50/90 ring-1 ring-brand-300 font-medium' : 'hover:bg-canvas/50'
+                )}
+              >
                 {showEmployee ?
                 <td className="px-5 py-3">
                     <div className="flex items-center gap-2.5">
@@ -66,7 +89,7 @@ export function LeaveTable({
                   </td> :
                 null}
                 <td className="px-5 py-3">
-                  <p className="font-medium text-ink">{LEAVE_TYPE_LABEL[row.type]}</p>
+                  <p className="font-medium text-ink">{LEAVE_TYPE_LABEL[row.type] || row.type}</p>
                   <p className="mt-0.5 max-w-xs truncate text-[12px] text-ink-soft" title={row.reason}>
                     {row.reason}
                   </p>
@@ -106,7 +129,15 @@ export function LeaveTable({
                         Cancel
                       </Button> :
                     null}
-                    {!canDecide && !canCancel ? <span className="text-[12px] text-ink-faint">—</span> : null}
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      icon={<CopyIcon className="h-3.5 w-3.5" />}
+                      onClick={() => void handleCopyLink(row.id)}
+                      title="Copy direct link for HR"
+                    >
+                      Copy link
+                    </Button>
                   </div>
                 </td>
               </tr>);

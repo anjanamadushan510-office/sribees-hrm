@@ -32,7 +32,7 @@ export function NotificationBell() {
         onClick={() => setOpen((value) => !value)}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
         aria-expanded={open}
-        className="relative rounded-md p-1.5 text-ink-soft transition-colors duration-150 ease-out hover:bg-canvas hover:text-ink">
+        className="relative rounded-md p-1.5 text-white transition-colors duration-150 ease-out hover:bg-white/20 hover:text-white">
         
         <BellIcon className="h-5 w-5" />
         {unread > 0 ?

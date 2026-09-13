@@ -17,13 +17,48 @@ import type { LeaveInput } from '../validation';
 import { recordAudit } from './audit';
 import { notifyAdmins, pushNotification } from './notifications';
 
-export const LEAVE_TYPES: LeaveType[] = ['annual', 'sick', 'parental', 'unpaid'];
+export const LEAVE_TYPES: LeaveType[] = [
+  'casual',
+  'sick',
+  'half_day',
+  'birthday',
+  'lieu',
+  'unpaid',
+  'annual',
+  'parental'
+];
 
-export const LEAVE_TYPE_LABEL: Record<LeaveType, string> = {
-  annual: 'Annual leave',
-  sick: 'Sick leave',
-  parental: 'Parental leave',
-  unpaid: 'Unpaid leave'
+export const LEAVE_TYPE_LABEL: Record<string, string> = {
+  casual: 'Casual Leave',
+  sick: 'Sick Leave',
+  half_day: 'Half Day Leave',
+  birthday: 'Birthday Leave',
+  lieu: 'Lieu Leave',
+  unpaid: 'No Pay Leave',
+  annual: 'Annual Leave',
+  parental: 'Parental Leave'
+};
+
+export const LEAVE_TYPE_DESCRIPTIONS: Record<string, string> = {
+  casual: 'For personal plans. Please request 2-3 days in advance.',
+  sick: 'For health issues. Inform HR & your Team Lead ASAP.',
+  half_day: 'For brief personal matters (Morning/Evening).',
+  birthday: 'Enjoy your special day! Take a day off on your birthday. 🎂',
+  lieu: 'Compensatory time off for working on weekends or public holidays.',
+  unpaid: 'For extended time off or when paid leave balances are exhausted. Requires prior management approval.',
+  annual: 'Standard annual vacation days.',
+  parental: 'Maternity or paternity leave entitlement.'
+};
+
+export const DEFAULT_LEAVE_QUOTAS: Record<string, number> = {
+  casual: 7,
+  sick: 7,
+  half_day: 4,
+  birthday: 1,
+  lieu: 5,
+  unpaid: 15,
+  annual: 14,
+  parental: 30
 };
 
 export interface LeaveFilter {
@@ -264,6 +299,31 @@ days: number)
     if (existing) existing.days = Math.round(days);else
     db.leaveEntitlements.push({ employeeId, year, type, days: Math.round(days) });
     recordAudit(db, active, 'leave.entitlement_updated', 'leave_entitlement', employeeId, { type, days });
+    return computeBalances(employeeId);
+  });
+}
+
+export async function updateEmployeeEntitlements(
+  session: Session | null,
+  employeeId: string,
+  entitlementsMap: Record<string, number>
+): Promise<LeaveBalance[]> {
+  const active = requireAdmin(session);
+  await sleep(300);
+  const year = new Date().getFullYear();
+  return mutate((db) => {
+    Object.entries(entitlementsMap).forEach(([type, days]) => {
+      const parsedDays = Math.max(0, Math.min(365, Math.round(days || 0)));
+      const existing = db.leaveEntitlements.find(
+        (e) => e.employeeId === employeeId && e.year === year && e.type === type
+      );
+      if (existing) {
+        existing.days = parsedDays;
+      } else {
+        db.leaveEntitlements.push({ employeeId, year, type, days: parsedDays });
+      }
+    });
+    recordAudit(db, active, 'leave.entitlements_updated_bulk', 'leave_entitlement', employeeId, entitlementsMap);
     return computeBalances(employeeId);
   });
 }

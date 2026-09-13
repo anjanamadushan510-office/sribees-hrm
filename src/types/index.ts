@@ -4,7 +4,7 @@ export type EmploymentStatus = 'active' | 'invited' | 'suspended';
 
 export type WorkMode = 'office' | 'remote' | 'hybrid';
 
-export type LeaveType = 'annual' | 'sick' | 'unpaid' | 'parental';
+export type LeaveType = 'casual' | 'sick' | 'half_day' | 'birthday' | 'lieu' | 'unpaid' | 'annual' | 'parental' | string;
 
 export type LeaveStatus = 'pending' | 'approved' | 'rejected' | 'cancelled';
 
@@ -145,4 +145,5 @@ export interface Database {
   leaveEntitlements: LeaveEntitlement[];
   notifications: AppNotification[];
   auditLogs: AuditLogEntry[];
+  departments?: string[];
 }

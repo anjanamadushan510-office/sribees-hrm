@@ -65,7 +65,7 @@ export function validateLeave(input: LeaveInput): FieldErrors {
   if (!input.reason.trim()) errors.reason = 'Add a short reason so HR can review it.';else
   if (input.reason.trim().length < 8) errors.reason = 'Give a little more detail (8+ characters).';else
   if (input.reason.length > 500) errors.reason = 'Keep the reason under 500 characters.';
-  if (!['annual', 'sick', 'unpaid', 'parental'].includes(input.type)) errors.type = 'Choose a leave type.';
+  if (!input.type) errors.type = 'Choose a leave type.';
   return errors;
 }
 
