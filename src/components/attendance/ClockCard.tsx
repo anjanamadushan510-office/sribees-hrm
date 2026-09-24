@@ -1,31 +1,53 @@
-import React, { useCallback, useState } from 'react';
-import { toast } from 'sonner';
-import { CoffeeIcon, LogInIcon, LogOutIcon, MapPinIcon, PlayIcon } from 'lucide-react';
-import type { WorkMode } from '../../types';
-import { useAuth } from '../../contexts/AuthContext';
-import { useAsync, useTicker } from '../../hooks/useAsync';
-import { clockIn, clockOut, getOpenShift, setPresence } from '../../utils/api/attendance';
-import { formatDuration, formatDurationWithSeconds, formatTime, workedMinutes, workedSeconds } from '../../utils/time';
-import { ValidationError, toMessage } from '../../utils/policies';
-import { Button } from '../ui/Button';
-import { TextField, TextAreaField } from '../ui/Field';
-import { Modal } from '../ui/Modal';
-import { Spinner } from '../ui/States';
-import { WorkModeBadge } from '../ui/Badge';
+import React, { useCallback, useState } from "react";
+import { toast } from "sonner";
+import {
+  CoffeeIcon,
+  LogInIcon,
+  LogOutIcon,
+  MapPinIcon,
+  PlayIcon,
+} from "lucide-react";
+import type { WorkMode } from "../../types";
+import { useAuth } from "../../contexts/AuthContext";
+import { useAsync, useTicker } from "../../hooks/useAsync";
+import {
+  clockIn,
+  clockOut,
+  getOpenShift,
+  setPresence,
+} from "../../utils/api/attendance";
+import {
+  formatDuration,
+  formatDurationWithSeconds,
+  formatTime,
+  workedMinutes,
+  workedSeconds,
+} from "../../utils/time";
+import { ValidationError, toMessage } from "../../utils/policies";
+import { Button } from "../ui/Button";
+import { TextField, TextAreaField } from "../ui/Field";
+import { Modal } from "../ui/Modal";
+import { Spinner } from "../ui/States";
+import { WorkModeBadge } from "../ui/Badge";
 
 export function ClockCard({ onChange }: { onChange?: () => void }) {
   const { session, profile } = useAuth();
   // Tick every 1000ms (1 second) for live seconds counter
   const tick = useTicker(1000);
-  const loader = useCallback(() => getOpenShift(session, session?.userId ?? ''), [session]);
+  const loader = useCallback(
+    () => getOpenShift(session, session?.userId ?? ""),
+    [session],
+  );
   const state = useAsync(loader, [session?.userId]);
 
   const [busy, setBusy] = useState(false);
   const [onBreak, setOnBreak] = useState(false);
-  const [breakStartTimestamp, setBreakStartTimestamp] = useState<number | null>(null);
+  const [breakStartTimestamp, setBreakStartTimestamp] = useState<number | null>(
+    null,
+  );
   const [outOpen, setOutOpen] = useState(false);
-  const [breakMinutes, setBreakMinutes] = useState('0');
-  const [note, setNote] = useState('');
+  const [breakMinutes, setBreakMinutes] = useState("0");
+  const [note, setNote] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const shift = state.data;
@@ -36,8 +58,8 @@ export function ClockCard({ onChange }: { onChange?: () => void }) {
   const handleClockIn = async () => {
     setBusy(true);
     try {
-      await clockIn(session, profile?.workMode ?? 'office');
-      toast.success('Clocked in. Have a good shift.');
+      await clockIn(session, profile?.workMode ?? "office");
+      toast.success("Clocked in. Have a good shift.");
       state.reload();
       onChange?.();
     } catch (error) {
@@ -52,20 +74,23 @@ export function ClockCard({ onChange }: { onChange?: () => void }) {
     try {
       if (!onBreak) {
         // Start Break
-        await setPresence(session, 'on_break');
+        await setPresence(session, "on_break");
         setOnBreak(true);
         setBreakStartTimestamp(Date.now());
-        toast.success('Break started. Take your time.');
+        toast.success("Break started. Take your time.");
       } else {
         // End Break / Resume Work
-        await setPresence(session, 'working');
+        await setPresence(session, "working");
         if (breakStartTimestamp) {
-          const addedMins = Math.max(1, Math.round((Date.now() - breakStartTimestamp) / 60000));
+          const addedMins = Math.max(
+            1,
+            Math.round((Date.now() - breakStartTimestamp) / 60000),
+          );
           setBreakMinutes((prev) => String(Number(prev) + addedMins));
         }
         setOnBreak(false);
         setBreakStartTimestamp(null);
-        toast.success('Break ended. Welcome back to work!');
+        toast.success("Break ended. Welcome back to work!");
       }
       state.reload();
       onChange?.();
@@ -82,9 +107,9 @@ export function ClockCard({ onChange }: { onChange?: () => void }) {
     setErrors({});
     try {
       await clockOut(session, Number(breakMinutes), note);
-      toast.success('Clocked out. Your hours are recorded.');
+      toast.success("Clocked out. Your hours are recorded.");
       setOutOpen(false);
-      setNote('');
+      setNote("");
       setOnBreak(false);
       setBreakStartTimestamp(null);
       state.reload();
@@ -134,12 +159,18 @@ export function ClockCard({ onChange }: { onChange?: () => void }) {
           <div className="flex flex-wrap items-center gap-2">
             {/* Start Break / Resume Work Button */}
             <Button
-              variant={onBreak ? 'primary' : 'secondary'}
+              variant={onBreak ? "primary" : "secondary"}
               loading={busy}
-              icon={onBreak ? <PlayIcon className="h-4 w-4" /> : <CoffeeIcon className="h-4 w-4" />}
+              icon={
+                onBreak ? (
+                  <PlayIcon className="h-4 w-4" />
+                ) : (
+                  <CoffeeIcon className="h-4 w-4" />
+                )
+              }
               onClick={handleToggleBreak}
             >
-              {onBreak ? 'Resume work' : 'Start break'}
+              {onBreak ? "Resume work" : "Start break"}
             </Button>
 
             {/* Clock Out Button */}
@@ -155,15 +186,23 @@ export function ClockCard({ onChange }: { onChange?: () => void }) {
       ) : (
         <div className="flex flex-wrap items-end justify-between gap-5">
           <div>
-            <p className="text-[13px] font-medium text-ink-soft">You are not clocked in</p>
-            <p className="mt-2 text-2xl font-semibold tracking-tight text-ink">Start your day</p>
+            <p className="text-[13px] font-medium text-ink-soft">
+              You are not clocked in
+            </p>
+            <p className="mt-2 text-2xl font-semibold tracking-tight text-ink">
+              Start your day
+            </p>
             <p className="mt-1 flex items-center gap-1.5 text-[13px] text-ink-soft">
-              Your hours are calculated from clock-in to clock-out, minus breaks. ·{' '}
-              <WorkModeBadge mode={profile?.workMode ?? 'office'} />
+              Your hours are calculated from clock-in to clock-out, minus
+              breaks. · <WorkModeBadge mode={profile?.workMode ?? "office"} />
             </p>
           </div>
           <div className="flex items-end gap-2">
-            <Button loading={busy} icon={<LogInIcon className="h-4 w-4" />} onClick={handleClockIn}>
+            <Button
+              loading={busy}
+              icon={<LogInIcon className="h-4 w-4" />}
+              onClick={handleClockIn}
+            >
               Clock in
             </Button>
           </div>
@@ -186,10 +225,21 @@ export function ClockCard({ onChange }: { onChange?: () => void }) {
           </>
         }
       >
-        <form id="clock-out-form" onSubmit={handleClockOut} className="space-y-4" noValidate>
+        <form
+          id="clock-out-form"
+          onSubmit={handleClockOut}
+          className="space-y-4"
+          noValidate
+        >
           <div className="rounded-lg border border-line bg-canvas px-4 py-3 text-[13px] text-ink-soft">
-            Shift started at <span className="font-medium text-ink">{formatTime(shift?.clockIn ?? null)}</span> ·
-            elapsed <span className="font-medium text-ink">{formatDuration(elapsedMins)}</span>
+            Shift started at{" "}
+            <span className="font-medium text-ink">
+              {formatTime(shift?.clockIn ?? null)}
+            </span>{" "}
+            · elapsed{" "}
+            <span className="font-medium text-ink">
+              {formatDuration(elapsedMins)}
+            </span>
           </div>
           <TextField
             label="Break taken (minutes)"
