@@ -16,39 +16,43 @@ export async function signIn(email: string, password: string): Promise<{ session
 
   const supabase = getSupabase();
   if (supabase) {
-    const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
-      email: email.trim().toLowerCase(),
-      password
-    });
+    try {
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password
+      });
 
-    if (authError || !authData.user) {
-      throw new AuthError(authError?.message || 'Incorrect email or password.');
+      if (!authError && authData.user) {
+        const { data: profileRow, error: profileError } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.user.id)
+          .single();
+
+        if (profileError || !profileRow) {
+          throw new AuthError('User profile not found in database.');
+        }
+
+        const profile = mapProfileFromDb(profileRow);
+
+        if (profile.status === 'suspended') {
+          await supabase.auth.signOut();
+          throw new ForbiddenError('This account is suspended. Contact People Operations.');
+        }
+
+        if (profile.status === 'invited') {
+          await supabase.auth.signOut();
+          throw new ForbiddenError('Finish setting up your account from the invitation link first.');
+        }
+
+        const session = buildSession(profile);
+        return { session, profile };
+      }
+    } catch (e) {
+      if (e instanceof ForbiddenError || e instanceof ValidationError) {
+        throw e;
+      }
     }
-
-    const { data: profileRow, error: profileError } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authData.user.id)
-      .single();
-
-    if (profileError || !profileRow) {
-      throw new AuthError('User profile not found in database.');
-    }
-
-    const profile = mapProfileFromDb(profileRow);
-
-    if (profile.status === 'suspended') {
-      await supabase.auth.signOut();
-      throw new ForbiddenError('This account is suspended. Contact People Operations.');
-    }
-
-    if (profile.status === 'invited') {
-      await supabase.auth.signOut();
-      throw new ForbiddenError('Finish setting up your account from the invitation link first.');
-    }
-
-    const session = buildSession(profile);
-    return { session, profile };
   }
 
   // Demo / Local storage fallback mode
@@ -77,22 +81,23 @@ export async function signIn(email: string, password: string): Promise<{ session
 export async function restoreSession(): Promise<{ session: Session; profile: Profile } | null> {
   const supabase = getSupabase();
   if (supabase) {
-    const { data: authData } = await supabase.auth.getSession();
-    if (!authData.session?.user) return null;
+    try {
+      const { data: authData } = await supabase.auth.getSession();
+      if (authData.session?.user) {
+        const { data: profileRow } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', authData.session.user.id)
+          .single();
 
-    const { data: profileRow } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', authData.session.user.id)
-      .single();
-
-    if (!profileRow || profileRow.status !== 'active') {
-      await supabase.auth.signOut();
-      return null;
+        if (profileRow && profileRow.status === 'active') {
+          const profile = mapProfileFromDb(profileRow);
+          return { session: buildSession(profile), profile };
+        }
+      }
+    } catch {
+      // Ignore Supabase restore error and fallback to local storage
     }
-
-    const profile = mapProfileFromDb(profileRow);
-    return { session: buildSession(profile), profile };
   }
 
   // Demo fallback mode

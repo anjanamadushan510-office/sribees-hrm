@@ -1,8 +1,8 @@
-'use client';
+"use client";
 
-import React, { useState } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
+import React, { useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
 import {
   CalendarDaysIcon,
   ClipboardListIcon,
@@ -13,12 +13,12 @@ import {
   ShieldCheckIcon,
   UserIcon,
   UsersIcon,
-  XIcon
-} from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
-import { cn } from '../../utils/cn';
-import { Avatar } from '../ui/Avatar';
-import { NotificationBell } from './NotificationBell';
+  XIcon,
+} from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
+import { cn } from "../../utils/cn";
+import { Avatar } from "../ui/Avatar";
+import { NotificationBell } from "./NotificationBell";
 
 interface NavItem {
   to: string;
@@ -28,13 +28,18 @@ interface NavItem {
 }
 
 const NAV: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboardIcon },
-  { to: '/attendance', label: 'My time', icon: ClockIcon },
-  { to: '/leave', label: 'Leave', icon: CalendarDaysIcon },
-  { to: '/team', label: 'Who is on', icon: UsersIcon },
-  { to: '/employees', label: 'People', icon: UsersIcon, adminOnly: true },
-  { to: '/audit', label: 'Audit log', icon: ClipboardListIcon, adminOnly: true },
-  { to: '/security', label: 'Security checks', icon: ShieldCheckIcon, adminOnly: true }
+  { to: "/", label: "Dashboard", icon: LayoutDashboardIcon },
+  { to: "/attendance", label: "My time", icon: ClockIcon },
+  { to: "/leave", label: "Leave", icon: CalendarDaysIcon },
+  { to: "/team", label: "Who is on", icon: UsersIcon },
+  { to: "/employees", label: "People", icon: UsersIcon, adminOnly: true },
+  /*   {
+    to: "/audit",
+    label: "Audit log",
+    icon: ClipboardListIcon,
+    adminOnly: true,
+  }, */
+  /*   { to: '/security', label: 'Security checks', icon: ShieldCheckIcon, adminOnly: true } */
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -47,23 +52,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const handleSignOut = async () => {
     await signOut();
-    router.replace('/login');
+    router.replace("/login");
   };
 
   const nav = (
     <nav aria-label="Main" className="flex flex-col gap-0.5">
       {items.map((item) => {
-        const currentPath = pathname ?? '';
-        const isActive = item.to === '/' ? currentPath === '/' : currentPath.startsWith(item.to);
+        const currentPath = pathname ?? "";
+        const isActive =
+          item.to === "/"
+            ? currentPath === "/"
+            : currentPath.startsWith(item.to);
         return (
           <Link
             key={item.to}
             href={item.to}
             onClick={() => setMobileOpen(false)}
             className={cn(
-              'flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-semibold',
-              'transition-colors duration-150 ease-out',
-              isActive ? 'bg-white text-brand-900 font-bold shadow-sm' : 'text-white hover:bg-white/20 hover:text-white'
+              "flex items-center gap-2.5 rounded-md px-3 py-2 text-sm font-semibold",
+              "transition-colors duration-150 ease-out",
+              isActive
+                ? "bg-white text-brand-900 font-bold shadow-sm"
+                : "text-white hover:bg-white/20 hover:text-white",
             )}
           >
             <item.icon className="h-4 w-4 shrink-0" />
@@ -97,7 +107,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Brand compact />
             </div>
             <p className="hidden text-sm font-semibold text-white lg:block">
-              {items.find((item) => item.to === pathname)?.label ?? 'Sribees HRM'}
+              {items.find((item) => item.to === pathname)?.label ??
+                "Sribees HRM"}
             </p>
           </div>
           <div className="flex items-center gap-1.5">
@@ -107,26 +118,38 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               aria-label="Your profile"
               className="rounded-full transition-opacity duration-150 ease-out hover:opacity-80"
             >
-              <Avatar name={profile?.fullName ?? '?'} size="sm" />
+              <Avatar name={profile?.fullName ?? "?"} size="sm" />
             </Link>
           </div>
         </header>
 
-        {profile?.mustChangePassword && pathname !== '/profile' ? (
+        {profile?.mustChangePassword && pathname !== "/profile" ? (
           <div className="flex items-center justify-center gap-2 border-b border-warn/20 bg-warn-soft px-4 py-2 text-center text-xs font-medium text-warn-ink">
-            <span>You are logged in with a temporary default password. Please update your password for security.</span>
-            <Link href="/profile#change-password" className="font-bold underline hover:opacity-80">
+            <span>
+              You are logged in with a temporary default password. Please update
+              your password for security.
+            </span>
+            <Link
+              href="/profile#change-password"
+              className="font-bold underline hover:opacity-80"
+            >
               Change password
             </Link>
           </div>
         ) : null}
 
-        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+        <main className="mx-auto w-full max-w-[1400px] flex-1 px-4 py-6 lg:px-8 lg:py-8">
+          {children}
+        </main>
       </div>
 
       {mobileOpen ? (
         <div className="fixed inset-0 z-50 lg:hidden">
-          <div className="absolute inset-0 bg-ink/35" onClick={() => setMobileOpen(false)} aria-hidden />
+          <div
+            className="absolute inset-0 bg-ink/35"
+            onClick={() => setMobileOpen(false)}
+            aria-hidden
+          />
           <div className="relative flex h-full w-64 flex-col border-r border-line bg-sidebar px-3 py-4">
             <div className="flex items-center justify-between">
               <Brand />
@@ -151,11 +174,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 function Brand({ compact = false }: { compact?: boolean }) {
   return (
     <div className="flex items-center gap-2 px-1">
-      <img src="/logo.png" alt="Logo" className="h-7 w-auto object-contain max-w-[120px]" />
+      <img
+        src="/logo.png"
+        alt="Logo"
+        className="h-7 w-auto object-contain max-w-[120px]"
+      />
       {!compact ? (
-        <span className="text-sm font-bold tracking-tight text-white">
-          HRM
-        </span>
+        <span className="text-sm font-bold tracking-tight text-white">HRM</span>
       ) : null}
     </div>
   );
@@ -172,8 +197,12 @@ function AccountCard({ onSignOut }: { onSignOut: () => void }) {
       >
         <Avatar name={profile.fullName} size="sm" />
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[13px] font-semibold text-white">{profile.fullName}</span>
-          <span className="block truncate text-[12px] font-medium text-white">{isAdmin ? 'HR administrator' : 'Employee'}</span>
+          <span className="block truncate text-[13px] font-semibold text-white">
+            {profile.fullName}
+          </span>
+          <span className="block truncate text-[12px] font-medium text-white">
+            {isAdmin ? "HR administrator" : "Employee"}
+          </span>
         </span>
         <UserIcon className="h-3.5 w-3.5 text-white" />
       </Link>
